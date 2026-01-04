@@ -22,9 +22,8 @@
 </svelte:head>
 
 <PortalContainer
-  totalDuration={20}
+  totalDuration={30}
   scrollSpeed={65}
-  transitionDuration={0.8}
   markers={true}
 >
   <!-- Scene 1: Hero -->

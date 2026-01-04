@@ -33,7 +33,7 @@
   let {
     totalDuration,
     scrollSpeed = 65,
-    transitionDuration = 0.8,
+    transitionDuration = 1.6,  // Doubled for smoother scroll-linked animation
     markers = false,
     children,
   }: PortalContainerProps & { children: any } = $props()

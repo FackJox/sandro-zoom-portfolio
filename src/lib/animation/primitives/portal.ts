@@ -77,43 +77,59 @@ export function createPortalTransition(
   console.log(`[Portal] Creating transition | duration=${duration}s anchor=${anchorPoint}`)
 
   // -------------------------------------------------------------------------
-  // Outgoing Scene: Scale (slower easing)
+  // Outgoing Scene: Scale (slower easing) - use fromTo for consistent behavior
   // -------------------------------------------------------------------------
-  tl.to(outgoingScene, {
-    scale: 0.3,
-    duration,
-    ease: 'portalScale',
-    onStart: () => console.log('[Portal] Outgoing scale started'),
-    onComplete: () => console.log('[Portal] Outgoing scale complete'),
-  }, 0)
+  tl.fromTo(outgoingScene,
+    {
+      scale: 1,
+      transformOrigin: anchorPoint,
+    },
+    {
+      scale: 0.3,
+      duration,
+      ease: 'portalScale',
+      onStart: () => console.log('[Portal] Outgoing scale started'),
+      onComplete: () => console.log('[Portal] Outgoing scale complete'),
+    },
+    0
+  )
 
   // -------------------------------------------------------------------------
   // Outgoing Scene: Mask (faster easing - creates iris effect)
   // -------------------------------------------------------------------------
-  tl.to(outgoingScene, {
-    clipPath: clipEnd,
-    duration,
-    ease: 'irisMask',
-    onUpdate: function() {
-      // Log at 25%, 50%, 75% progress
-      const progress = this.progress()
-      if (progress > 0.24 && progress < 0.26) {
-        console.log('[Portal] Mask at 25%:', (this.targets()[0] as HTMLElement).style.clipPath)
-      }
-      if (progress > 0.49 && progress < 0.51) {
-        console.log('[Portal] Mask at 50%:', (this.targets()[0] as HTMLElement).style.clipPath)
-      }
+  tl.fromTo(outgoingScene,
+    {
+      clipPath: clipStart,
     },
-  }, 0)
+    {
+      clipPath: clipEnd,
+      duration,
+      ease: 'irisMask',
+      onUpdate: function() {
+        const progress = this.progress()
+        if (progress > 0.24 && progress < 0.26) {
+          console.log('[Portal] Mask at 25%:', (this.targets()[0] as HTMLElement).style.clipPath)
+        }
+        if (progress > 0.49 && progress < 0.51) {
+          console.log('[Portal] Mask at 50%:', (this.targets()[0] as HTMLElement).style.clipPath)
+        }
+      },
+    },
+    0
+  )
 
   // -------------------------------------------------------------------------
-  // Outgoing Scene: Final opacity fade (last 200ms)
+  // Outgoing Scene: Final opacity fade (last 25% of duration)
   // -------------------------------------------------------------------------
-  tl.to(outgoingScene, {
-    opacity: 0,
-    duration: 0.2,
-    ease: 'none',
-  }, duration - 0.2)
+  tl.fromTo(outgoingScene,
+    { opacity: 1 },
+    {
+      opacity: 0,
+      duration: duration * 0.25,
+      ease: 'none',
+    },
+    duration * 0.75
+  )
 
   // -------------------------------------------------------------------------
   // Incoming Scene: Scale settle + opacity
@@ -145,13 +161,17 @@ export function createPortalTransition(
     : []
   if (outgoingText.length > 0) {
     console.log('[Portal] Outgoing text elements:', outgoingText.length)
-    tl.to(outgoingText, {
-      x: -60,
-      opacity: 0,
-      duration: 0.4,
-      stagger: 0.05,
-      ease: 'power2.in',
-    }, 0)
+    tl.fromTo(outgoingText,
+      { x: 0, opacity: 1 },
+      {
+        x: -60,
+        opacity: 0,
+        duration: duration * 0.5,
+        stagger: 0.08,
+        ease: 'power2.in',
+      },
+      0
+    )
   }
 
   // -------------------------------------------------------------------------
@@ -170,11 +190,11 @@ export function createPortalTransition(
       {
         x: 0,
         opacity: 1,
-        duration: 0.45,
+        duration: duration * 0.5,
         stagger: 0.1,
         ease: 'power2.out',
       },
-      0.25
+      duration * 0.3  // Start after 30% of transition
     )
   }
 
