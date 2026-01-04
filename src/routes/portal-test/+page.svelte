@@ -25,6 +25,7 @@
   totalDuration={30}
   scrollSpeed={65}
   markers={true}
+  debug={true}
 >
   <!-- Scene 1: Hero - Text from both sides meeting in middle -->
   <div

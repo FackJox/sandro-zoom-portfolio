@@ -199,5 +199,6 @@ export {
   setupOutgoingScene,
   setupIncomingScene,
   type PortalTransitionConfig,
+  type PortalTextAnimationConfig,
   type PortalTimeline,
 } from './portal'

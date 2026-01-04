@@ -54,7 +54,8 @@ interface ContentConfig {
 
 ### Presets
 
-Named positions based on common layouts:
+Named pos
+itions based on common layouts:
 
 ```typescript
 position: { preset: 'center' }

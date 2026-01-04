@@ -389,6 +389,69 @@ parallel(target: gsap.TweenTarget, props: ParallelProps, timeline: gsap.core.Tim
 keyframes(target: gsap.TweenTarget, props: KeyframesProps, timeline: gsap.core.Timeline): void
 ```
 
+### primitives/portal.ts
+
+Portal zoom transitions between full-screen scenes with iris mask effect.
+
+```typescript
+// Create scroll-linked portal transition between scenes
+createPortalTransition(
+  outgoingScene: gsap.TweenTarget,
+  incomingScene: gsap.TweenTarget,
+  config?: PortalTransitionConfig
+): PortalTimeline
+
+// Set up initial state for outgoing scene
+setupOutgoingScene(
+  scene: gsap.TweenTarget,
+  anchor?: { x: string; y: string }
+): void
+
+// Set up initial state for incoming scene (with zoom-out scale)
+setupIncomingScene(
+  scene: gsap.TweenTarget,
+  anchor?: { x: string; y: string },
+  scale?: number
+): void
+```
+
+**Configuration Types:**
+
+```typescript
+interface PortalTransitionConfig {
+  duration?: number                    // Transition duration (default: 1.6s)
+  anchor?: { x: string; y: string }    // Transform origin (default: 50% 45%)
+  textSelector?: string                // Text elements selector (default: '[data-animate="text"]')
+  incomingScale?: number               // Initial incoming scale (default: 2.0)
+  outgoingScale?: number               // Final outgoing scale (default: 0.3)
+  textAnimation?: PortalTextAnimationConfig
+  debug?: boolean                      // Enable console logging
+}
+
+interface PortalTextAnimationConfig {
+  distance?: number        // Animation distance in px (default: 100)
+  durationRatio?: number   // Duration as ratio of transition (default: 0.5)
+  startRatio?: number      // Start time as ratio of transition (default: 0.3)
+  stagger?: number         // Stagger between elements (default: 0.1)
+  ease?: string            // Easing function (default: 'power2.out')
+}
+
+interface PortalTimeline {
+  timeline: gsap.core.Timeline
+  duration: number
+}
+```
+
+**Directional Text Animations:**
+
+```html
+<!-- Supported data-direction values: left, right, up, down -->
+<div data-animate="text" data-direction="left">Slides from left</div>
+<div data-animate="text" data-direction="right">Slides from right</div>
+<div data-animate="text" data-direction="up">Slides from top</div>
+<div data-animate="text" data-direction="down">Slides from bottom</div>
+```
+
 ### gsap-passthrough.ts
 
 ```typescript
@@ -756,6 +819,47 @@ interface ValidationResult {
   scrollTrigger?: Partial<ScrollTrigger.Vars>
 />
 ```
+
+### PortalContainer
+
+Full-screen portal zoom transitions between scenes.
+
+```svelte
+<PortalContainer
+  totalDuration: number
+  scrollSpeed?: number
+  transitionDuration?: number
+  incomingScale?: number
+  outgoingScale?: number
+  anchor?: { x: string; y: string }
+  textAnimation?: PortalTextAnimationConfig
+  markers?: boolean
+  debug?: boolean
+>
+  <div data-scene="hero">Scene 1 content</div>
+  <div data-scene="about">Scene 2 content</div>
+</PortalContainer>
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `totalDuration` | `number` | required | Total scroll duration in seconds |
+| `scrollSpeed` | `number` | `65` | Scroll speed in px/s |
+| `transitionDuration` | `number` | `1.6` | Duration of each portal transition |
+| `incomingScale` | `number` | `2.0` | Initial scale for zoom-out reveal effect |
+| `outgoingScale` | `number` | `0.3` | Final scale for outgoing scene |
+| `anchor` | `{ x, y }` | `{ x: '50%', y: '45%' }` | Transform origin point |
+| `textAnimation` | `PortalTextAnimationConfig` | - | Text animation configuration |
+| `markers` | `boolean` | `false` | Show ScrollTrigger debug markers |
+| `debug` | `boolean` | `false` | Enable console logging |
+
+**Scene Elements:**
+
+- Use `data-scene="id"` to identify scenes
+- Use `data-animate="text"` for text elements that animate
+- Use `data-direction="left|right|up|down"` for directional text animations
 
 ### Layer
 
