@@ -189,3 +189,15 @@ export {
   type SkewConfig,
   type FlipConfig,
 } from './transform'
+
+// ============================================================================
+// Portal Transition Primitives
+// ============================================================================
+
+export {
+  createPortalTransition,
+  setupOutgoingScene,
+  setupIncomingScene,
+  type PortalTransitionConfig,
+  type PortalTimeline,
+} from './portal'
