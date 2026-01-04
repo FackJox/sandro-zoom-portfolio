@@ -26,39 +26,59 @@
   scrollSpeed={65}
   markers={true}
 >
-  <!-- Scene 1: Hero -->
+  <!-- Scene 1: Hero - Text from both sides meeting in middle -->
   <div
     data-scene="hero"
-    style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #1a1a2e, #16213e);"
+    style="position: absolute; inset: 0; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #1a1a2e, #16213e);"
   >
-    <h1 style="font-size: 4rem; font-weight: bold; color: white; margin-bottom: 1rem;" data-animate="text">HERO</h1>
-    <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7);" data-animate="text">Scene 1 - Scroll to transition</p>
+    <div style="position: absolute; left: 5%; top: 40%;" data-animate="text" data-direction="left">
+      <h1 style="font-size: 5rem; font-weight: bold; color: white; line-height: 1.1; margin: 0;">HERO</h1>
+    </div>
+    <div style="position: absolute; right: 5%; top: 50%; text-align: right;" data-animate="text" data-direction="right">
+      <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7); margin: 0;">Scene 1</p>
+      <p style="font-size: 1.2rem; color: rgba(255,255,255,0.5); margin: 0;">Scroll to transition</p>
+    </div>
   </div>
 
   <!-- Scene 2: Film -->
   <div
     data-scene="film"
-    style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #0f3460, #16213e);"
+    style="position: absolute; inset: 0; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #0f3460, #16213e);"
   >
-    <h1 style="font-size: 4rem; font-weight: bold; color: white; margin-bottom: 1rem;" data-animate="text">FILM</h1>
-    <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7);" data-animate="text">Scene 2 - 14 Peaks, K2</p>
+    <div style="position: absolute; left: 5%; top: 40%;" data-animate="text" data-direction="left">
+      <h1 style="font-size: 5rem; font-weight: bold; color: white; line-height: 1.1; margin: 0;">14 PEAKS</h1>
+    </div>
+    <div style="position: absolute; right: 5%; top: 50%; text-align: right;" data-animate="text" data-direction="right">
+      <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7); margin: 0;">Scene 2</p>
+      <p style="font-size: 1.2rem; color: rgba(255,255,255,0.5); margin: 0;">Documentary Film</p>
+    </div>
   </div>
 
   <!-- Scene 3: Stories -->
   <div
     data-scene="stories"
-    style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #533483, #16213e);"
+    style="position: absolute; inset: 0; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #533483, #16213e);"
   >
-    <h1 style="font-size: 4rem; font-weight: bold; color: white; margin-bottom: 1rem;" data-animate="text">STORIES</h1>
-    <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7);" data-animate="text">Scene 3 - Sasha, Grace</p>
+    <div style="position: absolute; left: 5%; top: 40%;" data-animate="text" data-direction="left">
+      <h1 style="font-size: 5rem; font-weight: bold; color: white; line-height: 1.1; margin: 0;">STORIES</h1>
+    </div>
+    <div style="position: absolute; right: 5%; top: 50%; text-align: right;" data-animate="text" data-direction="right">
+      <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7); margin: 0;">Scene 3</p>
+      <p style="font-size: 1.2rem; color: rgba(255,255,255,0.5); margin: 0;">Behind the scenes</p>
+    </div>
   </div>
 
   <!-- Scene 4: About -->
   <div
     data-scene="about"
-    style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #e94560, #16213e);"
+    style="position: absolute; inset: 0; overflow: hidden; transform-origin: 50% 45%; background: linear-gradient(135deg, #e94560, #16213e);"
   >
-    <h1 style="font-size: 4rem; font-weight: bold; color: white; margin-bottom: 1rem;" data-animate="text">ABOUT</h1>
-    <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7);" data-animate="text">Scene 4 - The Person</p>
+    <div style="position: absolute; left: 5%; top: 40%;" data-animate="text" data-direction="left">
+      <h1 style="font-size: 5rem; font-weight: bold; color: white; line-height: 1.1; margin: 0;">ABOUT</h1>
+    </div>
+    <div style="position: absolute; right: 5%; top: 50%; text-align: right;" data-animate="text" data-direction="right">
+      <p style="font-size: 1.5rem; color: rgba(255,255,255,0.7); margin: 0;">Scene 4</p>
+      <p style="font-size: 1.2rem; color: rgba(255,255,255,0.5); margin: 0;">The Person</p>
+    </div>
   </div>
 </PortalContainer>

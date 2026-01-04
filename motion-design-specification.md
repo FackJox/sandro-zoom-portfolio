@@ -149,7 +149,7 @@ These elements remain static and are **never masked** during transitions:
 
 #### Mechanism
 
-The outgoing scene is clipped to a **circular mask** centered on the play button. The mask radius shrinks from full coverage to zero while the scene simultaneously scales down. The incoming scene sits behind at slightly larger scale and settles to 1.0.
+The outgoing scene is clipped to a **circular mask** centered on the play button. The mask radius shrinks from full coverage to zero while the scene simultaneously scales down. The incoming scene sits behind at a **significantly larger scale (~1.4x)** and scales down to 1.0, creating a true "camera zooming out" sensation as content that was cropped at the edges reveals into view.
 
 #### Anchor Point
 
@@ -183,8 +183,19 @@ The mask radius shrinks **faster** than the scale, creating the "closing iris" e
 
 | Property | From | To | Duration | Delay | Easing |
 |----------|------|-----|----------|-------|--------|
-| `transform: scale()` | 1.15 | 1.0 | 800ms | 0ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| `opacity` | 0.85 | 1.0 | 400ms | 0ms | `ease-out` |
+| `transform: scale()` | **1.4** | 1.0 | 800ms | 0ms | `cubic-bezier(0, 0, 0.2, 1)` |
+| `opacity` | 1.0 | 1.0 | - | - | - |
+
+> **CRITICAL: Zoom-Out Reveal Effect**
+>
+> The incoming scene scale of **1.4x** (not 1.15x) is essential. At this scale:
+> - Title text is **cropped at the left edge** of the container
+> - Hero image (animal) is **cropped at the right edge**
+> - Sun element extends beyond its final position
+>
+> As the scene scales down to 1.0, this cropped content **reveals into view**, creating the sensation of the camera "pulling back" to show the full scene. This is what gives the transition its signature "zoom-out portal reveal" feel.
+>
+> The incoming scene does NOT fade in - it's already at full opacity behind the outgoing scene. The portal opening reveals it.
 
 #### Animated Properties: Outgoing Text
 
@@ -199,14 +210,19 @@ The mask radius shrinks **faster** than the scale, creating the "closing iris" e
 
 #### Animated Properties: Incoming Text
 
+> **Note:** Incoming text animation is primarily driven by the **scene scale** (1.4 → 1.0). Because the scene starts at 1.4x scale, the text is positioned outside the container's visible bounds. As the scene scales down, the text "slides in" from outside the frame.
+>
+> The optional translateX values below provide additional polish but are **secondary** to the scale effect:
+
 | Element | Property | From | To | Duration | Delay | Easing |
 |---------|----------|------|-----|----------|-------|--------|
-| Title | `translateX` | 60px | 0 | 450ms | 250ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| Title | `opacity` | 0 | 1 | 450ms | 250ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| Description | `translateX` | 40px | 0 | 400ms | 350ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| Description | `opacity` | 0 | 1 | 400ms | 350ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| Right caption | `translateX` | -40px | 0 | 350ms | 300ms | `cubic-bezier(0, 0, 0.2, 1)` |
-| Right caption | `opacity` | 0 | 1 | 350ms | 300ms | `cubic-bezier(0, 0, 0.2, 1)` |
+| Title | Driven by scene scale | (cropped at left edge) | (visible) | 800ms | 0ms | (inherits scene easing) |
+| Title | `translateX` (optional) | -40px | 0 | 500ms | 200ms | `cubic-bezier(0, 0, 0.2, 1)` |
+| Title | `opacity` | 0 | 1 | 400ms | 200ms | `ease-out` |
+| Description | `translateX` (optional) | -30px | 0 | 450ms | 300ms | `cubic-bezier(0, 0, 0.2, 1)` |
+| Description | `opacity` | 0 | 1 | 350ms | 300ms | `ease-out` |
+| Right caption | `translateX` (optional) | 30px | 0 | 400ms | 350ms | `cubic-bezier(0, 0, 0.2, 1)` |
+| Right caption | `opacity` | 0 | 1 | 350ms | 350ms | `ease-out` |
 
 #### Play Button Behavior
 
@@ -242,6 +258,85 @@ At ~200ms before the main portal shrink begins, the incoming scene's colors beco
 | **Trigger** | 200ms before main transition |
 | **Effect** | Corners of container show next scene |
 | **Implementation** | Incoming scene is already behind, container clips both |
+
+---
+
+### 4.4 Incoming Scene "Zoom-Out Reveal" (CRITICAL)
+
+This section documents the key visual effect that makes the incoming scene feel like the camera is "zooming out" to reveal it. **This is the most important detail for achieving the signature portal transition feel.**
+
+#### The Problem with Subtle Scale (1.15x)
+
+A small scale change (e.g., 1.15 → 1.0) creates a "settling" or "zoom-in" sensation because:
+- Content stays fully visible throughout the transition
+- The scale change is too subtle to create visual tension
+- It feels like the scene is "approaching" the viewer, not being revealed
+
+#### The Solution: Aggressive Scale with Edge Cropping (1.4x)
+
+At **1.4x scale**, the incoming scene's content extends **beyond the container boundaries**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ CONTAINER (visible area)                                     │
+│                                                              │
+│   ┌──────────────────────────────────────────────────────┐  │
+│ ▓▓│ "What the                                           │▓▓│
+│ ▓▓│ deer are                              🦌            │▓▓│
+│ ▓▓│ telling us"            ☀️ (oversized)              │▓▓│
+│ ▓▓│                                                     │▓▓│
+│   └──────────────────────────────────────────────────────┘  │
+│                                                              │
+│ ▓▓ = Content cropped at edges (not visible)                 │
+└─────────────────────────────────────────────────────────────┘
+
+AT SCALE 1.4x:
+- Title text "W" cropped at left edge
+- Deer image cropped at right edge
+- Sun extends beyond final position
+```
+
+#### Frame-by-Frame Breakdown
+
+| Progress | Scale | What's Visible | Sensation |
+|----------|-------|----------------|-----------|
+| 0% | 1.4 | Content cropped at all edges | Scene is "too close" |
+| 25% | 1.3 | Partial letters appearing at left | Something revealing |
+| 50% | 1.2 | Most content visible, still cropped | Camera pulling back |
+| 75% | 1.1 | Almost all content visible | Approaching final view |
+| 100% | 1.0 | Full scene visible, perfectly framed | Settled |
+
+#### Why This Creates "Zoom-Out" Feel
+
+1. **Hidden content reveals**: Text and images slide INTO view from outside the frame
+2. **Progressive revelation**: Each scroll increment shows more of the scene
+3. **Camera metaphor**: Matches mental model of camera pulling back from close-up
+4. **Edge awareness**: Visible cropping at container edges creates tension and anticipation
+
+#### Visual Comparison
+
+```
+WRONG (scale 1.15 → 1.0):
+┌─────────────────────┐    ┌─────────────────────┐
+│   Scene content     │ →  │   Scene content     │
+│   (fully visible)   │    │   (fully visible)   │
+│   Feels: settling   │    │   Feels: done       │
+└─────────────────────┘    └─────────────────────┘
+
+CORRECT (scale 1.4 → 1.0):
+┌─────────────────────┐    ┌─────────────────────┐
+│▓▓ Scene con ▓▓│ →  │   Scene content     │
+│▓▓ (cropped!) ▓▓│    │   (fully visible)   │
+│   Feels: revealing  │    │   Feels: arrived    │
+└─────────────────────┘    └─────────────────────┘
+```
+
+#### Implementation Requirements
+
+1. **Container must have `overflow: hidden`** - Essential for cropping effect
+2. **Scale origin at center (50% 45%)** - Matches portal anchor point
+3. **Transform-origin consistency** - Both scale and clip-path must use same origin
+4. **No opacity fade on incoming scene** - Scene is already visible, just cropped
 
 ---
 
@@ -534,7 +629,7 @@ Legend: ████ = animating, ░░░░ = idle/waiting
 
 .scene--incoming {
   z-index: 10;
-  transform: scale(1.15);
+  transform: scale(1.4);  /* CRITICAL: Large enough to crop content at edges */
   transform-origin: 50% 45%;
 }
 
@@ -579,9 +674,9 @@ function createPortalTransition(outgoing, incoming) {
     ease: 'none'
   }, 0.6);
 
-  // Incoming scene: scale settle
+  // Incoming scene: zoom-out reveal (CRITICAL: scale 1.4 for edge cropping effect)
   tl.fromTo(incoming,
-    { scale: 1.15 },
+    { scale: 1.4 },  // Large enough to crop content at container edges
     { scale: 1, duration: 0.8, ease: 'power2.out' },
     0
   );
@@ -752,6 +847,8 @@ function createScrollIndicator(element) {
 | Text animation direction | Left = exit left, enter from right | High |
 | Mask anchor | Centered on play button | High |
 | Leaf count | 4-5 leaves | Medium |
+| **Incoming scene scale** | **~1.4x (confirmed via frame analysis)** | **High** |
+| **Incoming text behavior** | **Cropped at edges due to scale, slides in** | **High** |
 
 ### Clarifications Needed
 
@@ -807,7 +904,7 @@ Key frames used in analysis (extracted at 2fps):
   --sun-center-y: 42%;
 
   /* Scales */
-  --incoming-start-scale: 1.15;
+  --incoming-start-scale: 1.4;  /* CRITICAL for zoom-out reveal effect */
   --outgoing-end-scale: 0.3;
 
   /* Colors - Kingfisher */
@@ -823,4 +920,6 @@ Key frames used in analysis (extracted at 2fps):
 
 ---
 
-*Specification generated from video analysis. Last updated: 2024-12-30*
+*Specification generated from video analysis. Last updated: 2025-01-04*
+
+*Revision note: Updated incoming scene scale from 1.15x to 1.4x based on detailed frame-by-frame analysis of transition. Added section 4.4 "Incoming Scene Zoom-Out Reveal" documenting the critical edge-cropping effect that creates the signature zoom-out sensation.*

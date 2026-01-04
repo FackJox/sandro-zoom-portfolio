@@ -132,20 +132,21 @@ export function createPortalTransition(
   )
 
   // -------------------------------------------------------------------------
-  // Incoming Scene: Scale settle + opacity
+  // Incoming Scene: Zoom-Out Reveal
+  // CRITICAL: Scale 2.0 creates dramatic edge cropping that reveals as it
+  // scales down, creating the signature "camera zooming out" sensation.
+  // No opacity fade needed - scene is already visible behind outgoing.
   // -------------------------------------------------------------------------
   tl.fromTo(incomingScene,
     {
-      scale: 1.15,
-      opacity: 0.85,
+      scale: 2.0,  // Large enough to dramatically crop content at container edges
     },
     {
       scale: 1,
-      opacity: 1,
       duration,
       ease: 'portalIn',
-      onStart: () => console.log('[Portal] Incoming scale started'),
-      onComplete: () => console.log('[Portal] Incoming scale complete'),
+      onStart: () => console.log('[Portal] Incoming zoom-out reveal started'),
+      onComplete: () => console.log('[Portal] Incoming zoom-out reveal complete'),
     },
     0
   )
@@ -175,27 +176,63 @@ export function createPortalTransition(
   }
 
   // -------------------------------------------------------------------------
-  // Incoming Text: Slide in from right with stagger (delayed)
+  // Incoming Text: Slide in from both sides (left text from left, right text from right)
   // -------------------------------------------------------------------------
   const incomingEl = typeof incomingScene === 'string'
     ? document.querySelector(incomingScene)
     : incomingScene
-  const incomingText = incomingEl
-    ? gsap.utils.toArray((incomingEl as Element).querySelectorAll(textSelector))
-    : []
-  if (incomingText.length > 0) {
-    console.log('[Portal] Incoming text elements:', incomingText.length)
-    tl.fromTo(incomingText,
-      { x: 60, opacity: 0 },
-      {
-        x: 0,
-        opacity: 1,
-        duration: duration * 0.5,
-        stagger: 0.1,
-        ease: 'power2.out',
-      },
-      duration * 0.3  // Start after 30% of transition
-    )
+
+  if (incomingEl) {
+    // Left-side text (slides in from left)
+    const leftText = gsap.utils.toArray((incomingEl as Element).querySelectorAll('[data-direction="left"]'))
+    if (leftText.length > 0) {
+      console.log('[Portal] Incoming left text elements:', leftText.length)
+      tl.fromTo(leftText,
+        { x: -100, opacity: 0 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: duration * 0.5,
+          stagger: 0.1,
+          ease: 'power2.out',
+        },
+        duration * 0.3
+      )
+    }
+
+    // Right-side text (slides in from right)
+    const rightText = gsap.utils.toArray((incomingEl as Element).querySelectorAll('[data-direction="right"]'))
+    if (rightText.length > 0) {
+      console.log('[Portal] Incoming right text elements:', rightText.length)
+      tl.fromTo(rightText,
+        { x: 100, opacity: 0 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: duration * 0.5,
+          stagger: 0.1,
+          ease: 'power2.out',
+        },
+        duration * 0.3
+      )
+    }
+
+    // Fallback: any text without direction (original behavior)
+    const defaultText = gsap.utils.toArray((incomingEl as Element).querySelectorAll(`${textSelector}:not([data-direction])`))
+    if (defaultText.length > 0) {
+      console.log('[Portal] Incoming default text elements:', defaultText.length)
+      tl.fromTo(defaultText,
+        { x: 60, opacity: 0 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: duration * 0.5,
+          stagger: 0.1,
+          ease: 'power2.out',
+        },
+        duration * 0.3
+      )
+    }
   }
 
   return {
@@ -224,15 +261,17 @@ export function setupOutgoingScene(scene: gsap.TweenTarget, anchor = { x: '50%',
 /**
  * Set up initial state for a scene that will be the incoming scene.
  * Call this on mount to ensure proper starting state.
+ *
+ * CRITICAL: Scale 2.0 creates dramatic edge cropping - this is what makes
+ * the transition feel like the camera is "zooming out" to reveal the scene.
  */
 export function setupIncomingScene(scene: gsap.TweenTarget, anchor = { x: '50%', y: '45%' }): void {
   const anchorPoint = `${anchor.x} ${anchor.y}`
 
   gsap.set(scene, {
-    scale: 1.15,
-    opacity: 0.85,
+    scale: 2.0,  // Large enough to dramatically crop content at container edges
     transformOrigin: anchorPoint,
   })
 
-  console.log(`[Portal] Setup incoming scene`)
+  console.log(`[Portal] Setup incoming scene (scale: 2.0 for zoom-out reveal)`)
 }
