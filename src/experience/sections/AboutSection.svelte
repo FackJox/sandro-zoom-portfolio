@@ -4,9 +4,10 @@
   About Me section - 3 beats telling the personal story.
   Each beat has its own background image.
   Scroll-driven beat navigation with click-to-navigate dots.
+  Horizontal carousel transitions between sub-segments.
 
   Design: Alpine Noir - personal narrative with documentary restraint
-  Motion: Machine/Documentary archetype - precise, camera-like
+  Motion: Machine/Documentary archetype - precise, camera-like pan transitions
   From: docs/plans/2025-12-30-portal-zoom-portfolio-design.md
 -->
 <script lang="ts">
@@ -47,12 +48,40 @@
 
   // State
   let containerEl: HTMLElement | null = $state(null)
+  let carouselTrackEl: HTMLElement | null = $state(null)
   let activeBeat = $state(0)
+  let previousBeat = $state(0)
   let ctx: gsap.Context | null = $state(null)
   let isScrollDriven = $state(true)
+  let isAnimating = $state(false)
 
-  // Derived
-  const currentBeat = $derived(beats[activeBeat])
+  // ============================================================================
+  // Carousel Animation
+  // ============================================================================
+
+  function animateToBeat(newIndex: number, oldIndex: number) {
+    if (!carouselTrackEl || isAnimating) return
+
+    isAnimating = true
+
+    // Animate the carousel track
+    gsap.to(carouselTrackEl, {
+      xPercent: -newIndex * 100,
+      duration: DURATION.standard,
+      ease: BRAND.lockOn,
+      onComplete: () => {
+        isAnimating = false
+      }
+    })
+  }
+
+  // Watch for activeBeat changes and trigger animation
+  $effect(() => {
+    if (activeBeat !== previousBeat && carouselTrackEl) {
+      animateToBeat(activeBeat, previousBeat)
+      previousBeat = activeBeat
+    }
+  })
 
   // ============================================================================
   // Scroll-Driven Navigation
@@ -82,12 +111,17 @@
     const sectionEnd = (sectionIndex + 1) * sceneHeight
 
     ctx = gsap.context(() => {
+      // Set initial position
+      if (carouselTrackEl) {
+        gsap.set(carouselTrackEl, { xPercent: 0 })
+      }
+
       ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `top+=${sectionEnd} top`,
         onUpdate: (self) => {
-          if (!isScrollDriven) return
+          if (!isScrollDriven || isAnimating) return
 
           const progress = self.progress
           const beatIndex = Math.min(
@@ -112,7 +146,7 @@
   // ============================================================================
 
   function handleDotClick(index: number) {
-    if (index === activeBeat) return
+    if (index === activeBeat || isAnimating) return
 
     isScrollDriven = false
     activeBeat = index
@@ -145,7 +179,7 @@
     height: '100%',
     objectFit: 'cover',
     filter: 'saturate(0.3) contrast(1.1)',
-    transition: `opacity ${DURATION.standard}s`,
+    transition: `opacity ${DURATION.standard}s ${BRAND.lockOn}`,
   })
 
   const overlayStyles = css({
@@ -163,14 +197,27 @@
     zIndex: '10',
   })
 
-  const beatContainerStyles = css({
+  const carouselContainerStyles = css({
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    zIndex: '10',
+  })
+
+  const carouselTrackStyles = css({
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+  })
+
+  const carouselSlideStyles = css({
+    flex: '0 0 100%',
+    width: '100%',
+    height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    height: '100%',
-    zIndex: '10',
   })
 
   const progressStyles = css({
@@ -201,7 +248,7 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="about">
-  <!-- Background Images -->
+  <!-- Background Images (crossfade with brand easing) -->
   {#each beats as beat, i}
     <img
       class={bgImageStyles}
@@ -220,11 +267,15 @@
     <SectionLabel text="ABOUT ME" />
   </div>
 
-  <!-- Beat Content (conditional render) -->
-  <div class={beatContainerStyles}>
-    {#key activeBeat}
-      <AboutBeat subtitle={currentBeat.subtitle} text={currentBeat.text} />
-    {/key}
+  <!-- Horizontal Carousel -->
+  <div class={carouselContainerStyles}>
+    <div bind:this={carouselTrackEl} class={carouselTrackStyles}>
+      {#each beats as beat}
+        <div class={carouselSlideStyles}>
+          <AboutBeat subtitle={beat.subtitle} text={beat.text} />
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Progress (clickable) -->

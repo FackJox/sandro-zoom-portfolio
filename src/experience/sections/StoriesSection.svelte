@@ -4,9 +4,10 @@
   Film Stories section - field stories and shorter pieces.
   Full-bleed background with story cards overlay.
   Scroll-driven beat navigation with click-to-navigate dots.
+  Horizontal carousel transitions between sub-segments.
 
   Design: Alpine Noir - documentary grit, personal stories
-  Motion: Machine/Documentary archetype - precise, camera-like
+  Motion: Machine/Documentary archetype - precise, camera-like pan transitions
   From: docs/plans/2025-12-30-portal-zoom-portfolio-design.md
 -->
 <script lang="ts">
@@ -55,12 +56,40 @@
 
   // State
   let containerEl: HTMLElement | null = $state(null)
+  let carouselTrackEl: HTMLElement | null = $state(null)
   let activeStory = $state(0)
+  let previousStory = $state(0)
   let ctx: gsap.Context | null = $state(null)
   let isScrollDriven = $state(true)
+  let isAnimating = $state(false)
 
-  // Derived
-  const currentStory = $derived(stories[activeStory])
+  // ============================================================================
+  // Carousel Animation
+  // ============================================================================
+
+  function animateToStory(newIndex: number, oldIndex: number) {
+    if (!carouselTrackEl || isAnimating) return
+
+    isAnimating = true
+
+    // Animate the carousel track
+    gsap.to(carouselTrackEl, {
+      xPercent: -newIndex * 100,
+      duration: DURATION.standard,
+      ease: BRAND.lockOn,
+      onComplete: () => {
+        isAnimating = false
+      }
+    })
+  }
+
+  // Watch for activeStory changes and trigger animation
+  $effect(() => {
+    if (activeStory !== previousStory && carouselTrackEl) {
+      animateToStory(activeStory, previousStory)
+      previousStory = activeStory
+    }
+  })
 
   // ============================================================================
   // Scroll-Driven Navigation
@@ -90,12 +119,17 @@
     const sectionEnd = (sectionIndex + 1) * sceneHeight
 
     ctx = gsap.context(() => {
+      // Set initial position
+      if (carouselTrackEl) {
+        gsap.set(carouselTrackEl, { xPercent: 0 })
+      }
+
       ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `top+=${sectionEnd} top`,
         onUpdate: (self) => {
-          if (!isScrollDriven) return
+          if (!isScrollDriven || isAnimating) return
 
           const progress = self.progress
           const beatIndex = Math.min(
@@ -120,7 +154,7 @@
   // ============================================================================
 
   function handleDotClick(index: number) {
-    if (index === activeStory) return
+    if (index === activeStory || isAnimating) return
 
     isScrollDriven = false
     activeStory = index
@@ -153,7 +187,7 @@
     height: '100%',
     objectFit: 'cover',
     filter: 'saturate(0.4) contrast(1.1)',
-    transition: `opacity ${DURATION.standard}s`,
+    transition: `opacity ${DURATION.standard}s ${BRAND.lockOn}`,
   })
 
   const overlayStyles = css({
@@ -171,14 +205,27 @@
     zIndex: '10',
   })
 
-  const cardContainerStyles = css({
+  const carouselContainerStyles = css({
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    zIndex: '10',
+  })
+
+  const carouselTrackStyles = css({
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+  })
+
+  const carouselSlideStyles = css({
+    flex: '0 0 100%',
+    width: '100%',
+    height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    height: '100%',
-    zIndex: '10',
   })
 
   const progressStyles = css({
@@ -231,7 +278,7 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="stories">
-  <!-- Background Images -->
+  <!-- Background Images (crossfade with brand easing) -->
   {#each stories as story, i}
     <img
       class={bgImageStyles}
@@ -250,16 +297,20 @@
     <SectionLabel text="FILM -- FIELD STORIES" />
   </div>
 
-  <!-- Story Card (conditional render) -->
-  <div class={cardContainerStyles}>
-    {#key activeStory}
-      <StoryCard
-        title={currentStory.title}
-        subtitle={currentStory.subtitle}
-        client={currentStory.client}
-        description={currentStory.description}
-      />
-    {/key}
+  <!-- Horizontal Carousel -->
+  <div class={carouselContainerStyles}>
+    <div bind:this={carouselTrackEl} class={carouselTrackStyles}>
+      {#each stories as story}
+        <div class={carouselSlideStyles}>
+          <StoryCard
+            title={story.title}
+            subtitle={story.subtitle}
+            client={story.client}
+            description={story.description}
+          />
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Progress with Labels (clickable) -->

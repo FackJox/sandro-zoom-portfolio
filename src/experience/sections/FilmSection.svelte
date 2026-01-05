@@ -4,9 +4,10 @@
   Film section content - displays major documentary work.
   Full-bleed background image with film cards overlay.
   Scroll-driven beat navigation with click-to-navigate dots.
+  Horizontal carousel transitions between sub-segments.
 
   Design: Alpine Noir - cinematic, documentary focus
-  Motion: Machine/Documentary archetype - precise, camera-like
+  Motion: Machine/Documentary archetype - precise, camera-like pan transitions
   From: docs/plans/2025-12-30-portal-zoom-portfolio-design.md
 -->
 <script lang="ts">
@@ -55,13 +56,41 @@
 
   // State
   let containerEl: HTMLElement | null = $state(null)
+  let carouselTrackEl: HTMLElement | null = $state(null)
   let activeFilm = $state(0)
+  let previousFilm = $state(0)
   let ctx: gsap.Context | null = $state(null)
   let isScrollDriven = $state(true)
+  let isAnimating = $state(false)
 
-  // Derived
-  const currentFilm = $derived(films[activeFilm])
-  const currentBgImage = $derived(currentFilm?.imageSrc ?? films[0].imageSrc)
+  // ============================================================================
+  // Carousel Animation
+  // ============================================================================
+
+  function animateToFilm(newIndex: number, oldIndex: number) {
+    if (!carouselTrackEl || isAnimating) return
+
+    isAnimating = true
+    const direction = newIndex > oldIndex ? -1 : 1 // -1 = slide left, 1 = slide right
+
+    // Animate the carousel track
+    gsap.to(carouselTrackEl, {
+      xPercent: -newIndex * 100,
+      duration: DURATION.standard,
+      ease: BRAND.lockOn,
+      onComplete: () => {
+        isAnimating = false
+      }
+    })
+  }
+
+  // Watch for activeFilm changes and trigger animation
+  $effect(() => {
+    if (activeFilm !== previousFilm && carouselTrackEl) {
+      animateToFilm(activeFilm, previousFilm)
+      previousFilm = activeFilm
+    }
+  })
 
   // ============================================================================
   // Scroll-Driven Navigation
@@ -92,12 +121,17 @@
     const sectionEnd = (sectionIndex + 1) * sceneHeight
 
     ctx = gsap.context(() => {
+      // Set initial position
+      if (carouselTrackEl) {
+        gsap.set(carouselTrackEl, { xPercent: 0 })
+      }
+
       ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `top+=${sectionEnd} top`,
         onUpdate: (self) => {
-          if (!isScrollDriven) return
+          if (!isScrollDriven || isAnimating) return
 
           const progress = self.progress
           const beatIndex = Math.min(
@@ -122,7 +156,7 @@
   // ============================================================================
 
   function handleDotClick(index: number) {
-    if (index === activeFilm) return
+    if (index === activeFilm || isAnimating) return
 
     isScrollDriven = false
     activeFilm = index
@@ -156,7 +190,7 @@
     height: '100%',
     objectFit: 'cover',
     filter: 'saturate(0.4) contrast(1.1)',
-    transition: `opacity ${DURATION.standard}s`,
+    transition: `opacity ${DURATION.standard}s ${BRAND.lockOn}`,
   })
 
   const overlayStyles = css({
@@ -174,14 +208,27 @@
     zIndex: '10',
   })
 
-  const cardContainerStyles = css({
+  const carouselContainerStyles = css({
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    zIndex: '10',
+  })
+
+  const carouselTrackStyles = css({
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+  })
+
+  const carouselSlideStyles = css({
+    flex: '0 0 100%',
+    width: '100%',
+    height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    height: '100%',
-    zIndex: '10',
   })
 
   const progressStyles = css({
@@ -213,7 +260,7 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="film">
-  <!-- Background Images (preload all, show active) -->
+  <!-- Background Images (crossfade with brand easing) -->
   {#each films as film, i}
     <img
       class={bgImageStyles}
@@ -232,16 +279,20 @@
     <SectionLabel text="FILM -- HIGH ALTITUDE FEATURES" />
   </div>
 
-  <!-- Film Card (conditional render) -->
-  <div class={cardContainerStyles}>
-    {#key activeFilm}
-      <FilmCard
-        title={currentFilm.title}
-        client={currentFilm.client}
-        year={currentFilm.year}
-        description={currentFilm.description}
-      />
-    {/key}
+  <!-- Horizontal Carousel -->
+  <div class={carouselContainerStyles}>
+    <div bind:this={carouselTrackEl} class={carouselTrackStyles}>
+      {#each films as film}
+        <div class={carouselSlideStyles}>
+          <FilmCard
+            title={film.title}
+            client={film.client}
+            year={film.year}
+            description={film.description}
+          />
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Progress Dots (clickable) -->
