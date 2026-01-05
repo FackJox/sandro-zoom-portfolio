@@ -2,7 +2,7 @@
   HeroSection.svelte
 
   Hero section content for Sandro's portfolio.
-  Displays name, tagline, description, and client logos.
+  Full-bleed showreel video with name, tagline, and client logos.
 
   Design: Alpine Noir - "controlled fall: precise, cinematic"
   From: docs/Brand Design System.md, docs/plans/2025-12-30-portal-zoom-portfolio-design.md
@@ -17,16 +17,18 @@
     tagline?: string
     description?: string
     showLogos?: boolean
+    videoSrc?: string
   }
 
   let {
     title = 'SANDRO',
     tagline = 'HIGH ALTITUDE & HOSTILE ENVIRONMENT',
     description = "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering.",
-    showLogos = true
+    showLogos = true,
+    videoSrc = '/videos/showreel.mp4'
   }: Props = $props()
 
-  // Container - full bleed with gradient overlay
+  // Container - full bleed
   const containerStyles = css({
     position: 'absolute',
     inset: '0',
@@ -36,7 +38,26 @@
     justifyContent: 'center',
     overflow: 'hidden',
     transformOrigin: '50% 45%',
-    background: 'linear-gradient(180deg, rgba(15, 23, 26, 0.3) 0%, rgba(15, 23, 26, 0.8) 100%)',
+    backgroundColor: '#0a0a0a',
+  })
+
+  // Video background layer
+  const videoStyles = css({
+    position: 'absolute',
+    inset: '0',
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    // Desaturate and increase contrast per brand spec
+    filter: 'saturate(0.3) contrast(1.1)',
+  })
+
+  // Dark gradient overlay for text legibility
+  const overlayStyles = css({
+    position: 'absolute',
+    inset: '0',
+    background: 'linear-gradient(180deg, rgba(15, 23, 26, 0.4) 0%, rgba(15, 23, 26, 0.7) 50%, rgba(15, 23, 26, 0.9) 100%)',
+    pointerEvents: 'none',
   })
 
   // Content wrapper - centered slab
@@ -103,6 +124,21 @@
 </script>
 
 <div class={containerStyles} data-scene="hero">
+  <!-- Video Background -->
+  <video
+    class={videoStyles}
+    src={videoSrc}
+    autoplay
+    loop
+    muted
+    playsinline
+    disablepictureinpicture
+  ></video>
+
+  <!-- Dark Overlay -->
+  <div class={overlayStyles}></div>
+
+  <!-- Content -->
   <div class={contentStyles}>
     <h1 class={titleStyles} data-animate="text">{title}</h1>
     <p class={taglineStyles} data-animate="text">{tagline}</p>

@@ -2,7 +2,7 @@
   ContactSection.svelte
 
   Final Contact section - CTA with contact information.
-  Background scene with contact block positioned left.
+  BTS scene background with contact block positioned left.
   Space for 3D camera reveal (deferred feature).
 
   Design: Alpine Noir - final frame, call to action
@@ -13,6 +13,12 @@
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ContactBlock from '../components/ui/ContactBlock.svelte'
 
+  interface Props {
+    backgroundSrc?: string
+  }
+
+  let { backgroundSrc = '/pictures/Film Himal Sicker 01.jpg' }: Props = $props()
+
   const containerStyles = css({
     position: 'absolute',
     inset: '0',
@@ -20,8 +26,25 @@
     flexDirection: 'column',
     overflow: 'hidden',
     transformOrigin: '50% 45%',
-    // Subtle gradient suggesting depth/scene
-    background: 'linear-gradient(135deg, rgba(15, 23, 26, 0.95) 0%, rgba(10, 10, 10, 1) 100%)',
+    backgroundColor: '#0a0a0a',
+  })
+
+  // Background image
+  const bgImageStyles = css({
+    position: 'absolute',
+    inset: '0',
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    filter: 'saturate(0.3) contrast(1.1)',
+  })
+
+  // Dark overlay - asymmetric to leave right side more visible for camera
+  const overlayStyles = css({
+    position: 'absolute',
+    inset: '0',
+    background: 'linear-gradient(90deg, rgba(10, 10, 10, 0.85) 0%, rgba(10, 10, 10, 0.6) 50%, rgba(10, 10, 10, 0.4) 100%)',
+    pointerEvents: 'none',
   })
 
   const labelContainerStyles = css({
@@ -98,6 +121,17 @@
 </script>
 
 <div class={containerStyles} data-scene="contact">
+  <!-- Background Image -->
+  <img
+    class={bgImageStyles}
+    src={backgroundSrc}
+    alt=""
+    loading="eager"
+  />
+
+  <!-- Dark Overlay -->
+  <div class={overlayStyles}></div>
+
   <div class={labelContainerStyles}>
     <SectionLabel text="GET IN TOUCH" variant="accent" />
   </div>

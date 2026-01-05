@@ -145,6 +145,47 @@ export function isValidEase(ease: string): boolean {
 }
 
 // ============================================================================
+// Brand Motion Tokens (Alpine Noir)
+// ============================================================================
+
+/**
+ * Alpine Noir brand motion tokens.
+ * Machine/Documentary archetype - precise, camera-like motion.
+ *
+ * From: docs/Brand Physics Archtype.md
+ */
+export const BRAND = {
+  /**
+   * Lock-on easing - fast acquisition, smooth settle.
+   * Like a gimbal finding and locking onto a subject.
+   * Used for: elements entering frame, zoom-ins, content appearing.
+   */
+  lockOn: 'cubic-bezier(0.19, 1.0, 0.22, 1.0)',
+
+  /**
+   * Release easing - gentler departure, controlled fade.
+   * Like a camera operator releasing a subject before the next shot.
+   * Used for: elements exiting frame, zoom-outs, sections departing.
+   */
+  release: 'cubic-bezier(0.25, 0.0, 0.35, 1.0)',
+} as const
+
+/**
+ * Brand duration tokens in seconds.
+ * Tight tolerances - machines don't wander.
+ */
+export const DURATION = {
+  /** Micro: 175ms - opacity changes, color shifts, small state changes */
+  micro: 0.175,
+
+  /** Standard: 315ms - most UI transitions, lens badge movement */
+  standard: 0.315,
+
+  /** Cinematic: 550ms - major transitions, portal zooms, full-frame reveals */
+  cinematic: 0.55,
+} as const
+
+// ============================================================================
 // Default Easing
 // ============================================================================
 
