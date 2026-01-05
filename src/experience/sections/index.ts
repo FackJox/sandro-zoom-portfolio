@@ -1,5 +1,7 @@
 // Section Components barrel export
 export { default as HeroSection } from './HeroSection.svelte'
+export { default as ShowreelSection } from './ShowreelSection.svelte'
+export { default as HeroShowreelScene } from './HeroShowreelScene.svelte'
 export { default as FilmSection } from './FilmSection.svelte'
 export { default as StoriesSection } from './StoriesSection.svelte'
 export { default as AboutSection } from './AboutSection.svelte'

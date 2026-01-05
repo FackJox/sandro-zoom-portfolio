@@ -5,28 +5,26 @@
   Full-bleed showreel video with name, tagline, and client logos.
 
   Design: Alpine Noir - "controlled fall: precise, cinematic"
-  From: docs/Brand Design System.md, docs/plans/2025-12-30-portal-zoom-portfolio-design.md
+  From: docs/plans/2025-01-05-ui-aesthetic-design.md
 -->
 <script lang="ts">
   import { css } from '$styled/css'
   import LogoStrip from '../components/ui/LogoStrip.svelte'
-  import MetadataStrip from '../components/ui/MetadataStrip.svelte'
+  import ScrollHint from '../components/ui/ScrollHint.svelte'
 
   interface Props {
-    title?: string
-    tagline?: string
-    description?: string
-    showLogos?: boolean
     videoSrc?: string
   }
 
   let {
-    title = 'SANDRO',
-    tagline = 'HIGH ALTITUDE & HOSTILE ENVIRONMENT',
-    description = "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering.",
-    showLogos = true,
     videoSrc = '/videos/showreel.mp4'
   }: Props = $props()
+
+  // Copy from design spec
+  const title = 'sandrogh'
+  const tagline = 'HIGH ALTITUDE & HOSTILE ENVIRONMENT'
+  const description = "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering."
+  const secondary = "With feeling and fortitude I have the experience to bring human stories from the world's most inhumane corners."
 
   // Container - full bleed
   const containerStyles = css({
@@ -38,7 +36,7 @@
     justifyContent: 'center',
     overflow: 'hidden',
     transformOrigin: '50% 45%',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: 'brand.bg',
   })
 
   // Video background layer
@@ -68,20 +66,27 @@
     textAlign: 'center',
     maxWidth: '800px',
     padding: '0 2rem',
+    zIndex: '10',
   })
 
-  // Title - Trade Gothic Next Condensed Bold equivalent
-  // "tall, compressed, aggressive—like a warning stencil"
+  // Title - lowercase per design spec
   const titleStyles = css({
     fontFamily: "'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif",
-    fontSize: 'clamp(4rem, 12vw, 10rem)',
+    fontSize: 'clamp(2.5rem, 15vw, 10rem)',
     fontWeight: '700',
     letterSpacing: '-0.02em',
     lineHeight: '0.9',
-    textTransform: 'uppercase',
+    // Lowercase per design spec
+    textTransform: 'lowercase',
     color: 'brand.accent',
     margin: '0',
-    // Egg Toast yellow - the "danger" color
+
+    '@media (min-width: 768px)': {
+      fontSize: 'clamp(3rem, 10vw, 5rem)',
+    },
+    '@media (min-width: 1024px)': {
+      fontSize: 'clamp(4rem, 12vw, 10rem)',
+    },
   })
 
   // Tagline - IBM Plex Sans
@@ -94,6 +99,11 @@
     color: 'brand.text',
     marginTop: '1.5rem',
     opacity: '0.8',
+
+    '@media (max-width: 767px)': {
+      fontSize: '0.75rem',
+      letterSpacing: '0.2em',
+    },
   })
 
   // Description - body copy
@@ -105,22 +115,40 @@
     color: 'brand.textMuted',
     marginTop: '1.5rem',
     maxWidth: '600px',
+
+    '@media (max-width: 767px)': {
+      fontSize: '0.9rem',
+    },
+  })
+
+  // Secondary description
+  const secondaryStyles = css({
+    fontFamily: "'IBM Plex Sans', sans-serif",
+    fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
+    fontWeight: '400',
+    fontStyle: 'italic',
+    lineHeight: '1.6',
+    color: 'brand.phantom',
+    marginTop: '1rem',
+    maxWidth: '550px',
   })
 
   // Logos container - bottom positioned
   const logosContainerStyles = css({
     position: 'absolute',
-    bottom: '8vh',
+    bottom: '12vh',
     left: '0',
     right: '0',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '0.5rem',
-  })
+    zIndex: '10',
 
-  // Metadata - altitude, credentials
-  const metadataItems = ['ALT 8,000M', 'K2 / EVEREST / NANGA PARBAT', 'HIGH ALTITUDE DOP']
+    '@media (max-width: 767px)': {
+      bottom: '15vh',
+    },
+  })
 </script>
 
 <div class={containerStyles} data-scene="hero">
@@ -133,22 +161,24 @@
     muted
     playsinline
     disablepictureinpicture
+    data-hero-video
   ></video>
 
-  <!-- Dark Overlay -->
-  <div class={overlayStyles}></div>
+  <!-- Dark Overlay (will animate during transition) -->
+  <div class={overlayStyles} data-hero-overlay></div>
 
   <!-- Content -->
-  <div class={contentStyles}>
+  <div class={contentStyles} data-hero-content>
     <h1 class={titleStyles} data-animate="text">{title}</h1>
     <p class={taglineStyles} data-animate="text">{tagline}</p>
     <p class={descriptionStyles} data-animate="text">{description}</p>
+    <p class={secondaryStyles} data-animate="text">{secondary}</p>
   </div>
 
-  {#if showLogos}
-    <div class={logosContainerStyles}>
-      <LogoStrip />
-      <MetadataStrip items={metadataItems} />
-    </div>
-  {/if}
+  <div class={logosContainerStyles} data-hero-logos>
+    <LogoStrip />
+  </div>
+
+  <!-- Scroll Hint -->
+  <ScrollHint />
 </div>
