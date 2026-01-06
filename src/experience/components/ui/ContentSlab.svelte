@@ -12,7 +12,7 @@
 
   interface Props {
     eyebrow?: string
-    title: string
+    title?: string
     description: string
     metadata?: string
     year?: string
@@ -96,7 +96,9 @@
     <span class={eyebrowStyles}>{eyebrow}</span>
   {/if}
 
-  <h3 class={titleStyles}>{title}</h3>
+  {#if title}
+    <h3 class={titleStyles}>{title}</h3>
+  {/if}
 
   <div class={dividerStyles}></div>
 

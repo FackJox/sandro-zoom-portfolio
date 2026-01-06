@@ -1,14 +1,13 @@
 <!--
   AboutSection.svelte
 
-  About Me section - 3 beats telling the personal story.
-  Each beat has its own background image.
-  Scroll-driven beat navigation with click-to-navigate dots.
-  Horizontal carousel transitions between sub-segments.
+  About section with two-column layout matching Film section.
+  Left: Bordered viewport with static images
+  Right: Content slab with beat text
 
-  Design: Alpine Noir - personal narrative with documentary restraint
-  Motion: Machine/Documentary archetype - precise, camera-like pan transitions
-  From: docs/plans/2025-12-30-portal-zoom-portfolio-design.md
+  Design: Two-column grid, scroll-driven beats
+  Motion: Machine archetype - precise pan transitions
+  From: docs/plans/2025-01-05-ui-aesthetic-design.md
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
@@ -16,77 +15,56 @@
   import { gsap, ScrollTrigger } from '$lib/core/gsap'
   import { BRAND, DURATION } from '$lib/animation/easing'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
-  import AboutBeat from '../components/ui/AboutBeat.svelte'
+  import BorderedViewport from '../components/ui/BorderedViewport.svelte'
+  import ContentSlab from '../components/ui/ContentSlab.svelte'
+  import ScrollHint from '../components/ui/ScrollHint.svelte'
 
-  interface Beat {
+  // About beat data structure
+  interface AboutBeat {
     id: string
     subtitle: string
     text: string
     imageSrc: string
   }
 
-  const beats: Beat[] = [
+  // 3 beats per design spec with correct copy
+  const beats: AboutBeat[] = [
     {
       id: 'frontline',
       subtitle: 'FRONT-LINE PERSPECTIVE',
-      text: "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering. I stood on the highest peak in Afghanistan. I filmed the first winter ascent of K2. I've been to Everest six times, and K2 three.",
+      text: "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering. I stood on the highest peak in Afghanistan, Mt Noshaq as the first Afghan woman summited and the highest peak in Pakistan, K2 as the first Pakistani woman summited. I filmed Nirmal Purja as he set a blazing speed record on the 14 8,000ers and filmed Kristin Harila as she smashed it.",
       imageSrc: '/pictures/heli rescue (1 of 2).jpg'
     },
     {
       id: 'origin',
       subtitle: 'ORIGIN STORY',
-      text: "A winding path brought me to the mountains. After dropping out of uni I spent 3 years in Birmingham filming raves, music videos and weddings. I joined the British Army as a combat camera operator, which led to assignments in Afghanistan, Iraq, and eventually the high peaks.",
+      text: "A winding path brought me to the mountains. After dropping out of uni I spent 3 years in Birmingham filming raves, music videos and weddings. Wanting to see more of the world I joined the British army reserve and soon the commando training combined with my passion for story telling provided opportunities to do just that. I filmed army expeds to Dhaulagiri in 2016 and Everest in 2017, began building a basecamp network and haven't really stopped carrying cameras up mountains since.",
       imageSrc: '/pictures/IMG_1101.JPG'
     },
     {
       id: 'values',
-      subtitle: 'VALUES & WORK',
-      text: "With feeling and fortitude I have the experience to bring human stories from the world's most inhumane corners. I believe in showing the truth, even when it's uncomfortable. The camera doesn't lie, but it can reveal what we'd rather not see.",
+      subtitle: 'VALUES + ONGOING WORK',
+      text: "With feeling and fortitude I have the experience to bring human stories from the world's most inhumane corners. I believe deeply in representation and hope the projects I've worked on show people what's possible when you look up and believe. Stories from the mountains and the people in between are slowly being collected on my Youtube channel.",
       imageSrc: '/pictures/push (19 of 22).jpg'
     }
   ]
 
   // State
   let containerEl: HTMLElement | null = $state(null)
-  let carouselTrackEl: HTMLElement | null = $state(null)
-  let activeBeat = $state(0)
-  let previousBeat = $state(0)
+  let activeIndex = $state(0)
   let ctx: gsap.Context | null = $state(null)
   let isScrollDriven = $state(true)
   let isAnimating = $state(false)
 
-  // ============================================================================
-  // Carousel Animation
-  // ============================================================================
-
-  function animateToBeat(newIndex: number, oldIndex: number) {
-    if (!carouselTrackEl || isAnimating) return
-
-    isAnimating = true
-
-    // Animate the carousel track
-    gsap.to(carouselTrackEl, {
-      xPercent: -newIndex * 100,
-      duration: DURATION.standard,
-      ease: BRAND.lockOn,
-      onComplete: () => {
-        isAnimating = false
-      }
-    })
+  // Handle bar selection (click navigation)
+  function handleBarSelect(index: number) {
+    if (index === activeIndex || isAnimating) return
+    isScrollDriven = false
+    activeIndex = index
+    setTimeout(() => { isScrollDriven = true }, DURATION.standard * 1000 + 100)
   }
 
-  // Watch for activeBeat changes and trigger animation
-  $effect(() => {
-    if (activeBeat !== previousBeat && carouselTrackEl) {
-      animateToBeat(activeBeat, previousBeat)
-      previousBeat = activeBeat
-    }
-  })
-
-  // ============================================================================
-  // Scroll-Driven Navigation
-  // ============================================================================
-
+  // Scroll-driven navigation
   onMount(() => {
     if (!containerEl) return
 
@@ -111,26 +89,16 @@
     const sectionEnd = (sectionIndex + 1) * sceneHeight
 
     ctx = gsap.context(() => {
-      // Set initial position
-      if (carouselTrackEl) {
-        gsap.set(carouselTrackEl, { xPercent: 0 })
-      }
-
       ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `top+=${sectionEnd} top`,
         onUpdate: (self) => {
           if (!isScrollDriven || isAnimating) return
-
           const progress = self.progress
-          const beatIndex = Math.min(
-            Math.floor(progress * beats.length),
-            beats.length - 1
-          )
-
-          if (beatIndex !== activeBeat) {
-            activeBeat = beatIndex
+          const beatIndex = Math.min(Math.floor(progress * beats.length), beats.length - 1)
+          if (beatIndex !== activeIndex) {
+            activeIndex = beatIndex
           }
         },
       })
@@ -141,53 +109,15 @@
     ctx?.revert()
   })
 
-  // ============================================================================
-  // Click Navigation
-  // ============================================================================
-
-  function handleDotClick(index: number) {
-    if (index === activeBeat || isAnimating) return
-
-    isScrollDriven = false
-    activeBeat = index
-
-    setTimeout(() => {
-      isScrollDriven = true
-    }, DURATION.standard * 1000 + 100)
-  }
-
-  // ============================================================================
   // Styles
-  // ============================================================================
-
   const containerStyles = css({
     position: 'absolute',
     inset: '0',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
     transformOrigin: '50% 45%',
-    backgroundColor: '#0a0a0a',
-  })
-
-  const bgImageStyles = css({
-    position: 'absolute',
-    inset: '0',
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    filter: 'saturate(0.3) contrast(1.1)',
-    transition: `opacity ${DURATION.standard}s ${BRAND.lockOn}`,
-  })
-
-  const overlayStyles = css({
-    position: 'absolute',
-    inset: '0',
-    background: 'linear-gradient(180deg, rgba(10, 10, 10, 0.7) 0%, rgba(10, 10, 10, 0.85) 100%)',
-    pointerEvents: 'none',
-    zIndex: '2',
+    backgroundColor: 'brand.bg',
   })
 
   const labelContainerStyles = css({
@@ -197,40 +127,54 @@
     zIndex: '10',
   })
 
-  const carouselContainerStyles = css({
-    position: 'relative',
+  const gridStyles = css({
+    display: 'grid',
+    gridTemplateColumns: '0.6fr 0.4fr',
+    gap: '2rem',
     width: '100%',
     height: '100%',
-    overflow: 'hidden',
-    zIndex: '10',
+    padding: '12vh 8vw',
+    boxSizing: 'border-box',
+
+    '@media (max-width: 1023px)': {
+      gridTemplateColumns: '0.55fr 0.45fr',
+      gap: '1.5rem',
+      padding: '10vh 6vw',
+    },
+    '@media (max-width: 767px)': {
+      gridTemplateColumns: '1fr',
+      gap: '1rem',
+      padding: '12vh 4vw 16vh',
+    },
   })
 
-  const carouselTrackStyles = css({
-    display: 'flex',
-    width: '100%',
-    height: '100%',
-  })
-
-  const carouselSlideStyles = css({
-    flex: '0 0 100%',
-    width: '100%',
-    height: '100%',
+  const viewportContainerStyles = css({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   })
 
-  const progressStyles = css({
-    position: 'absolute',
-    bottom: '8vh',
+  const slabContainerStyles = css({
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem',
-    zIndex: '10',
   })
 
-  const dotStyles = css({
-    width: '8px',
+  const barContainerStyles = css({
+    position: 'absolute',
+    bottom: '8vh',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    zIndex: '10',
+
+    '@media (max-width: 767px)': {
+      bottom: '10vh',
+    },
+  })
+
+  const barStyles = css({
     height: '2px',
     backgroundColor: 'brand.phantom',
     border: 'none',
@@ -241,54 +185,57 @@
       backgroundColor: 'brand.textMuted',
     },
     '&[data-active="true"]': {
-      width: '24px',
       backgroundColor: 'brand.accent',
     },
   })
+
+  // Get current beat
+  const currentBeat = $derived(beats[activeIndex])
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="about">
-  <!-- Background Images (crossfade with brand easing) -->
-  {#each beats as beat, i}
-    <img
-      class={bgImageStyles}
-      src={beat.imageSrc}
-      alt=""
-      loading="eager"
-      style="opacity: {i === activeBeat ? 1 : 0}; z-index: {i === activeBeat ? 1 : 0};"
-    />
-  {/each}
-
-  <!-- Dark Overlay -->
-  <div class={overlayStyles}></div>
-
   <!-- Section Label -->
   <div class={labelContainerStyles}>
     <SectionLabel text="ABOUT ME" />
   </div>
 
-  <!-- Horizontal Carousel -->
-  <div class={carouselContainerStyles}>
-    <div bind:this={carouselTrackEl} class={carouselTrackStyles}>
-      {#each beats as beat}
-        <div class={carouselSlideStyles}>
-          <AboutBeat subtitle={beat.subtitle} text={beat.text} />
-        </div>
-      {/each}
+  <!-- Two-Column Grid -->
+  <div class={gridStyles}>
+    <!-- Left: Bordered Viewport with Image -->
+    <div class={viewportContainerStyles}>
+      <BorderedViewport aspectRatio="16/9">
+        <img
+          src={currentBeat.imageSrc}
+          alt={currentBeat.subtitle}
+          style="width: 100%; height: 100%; object-fit: cover;"
+        />
+      </BorderedViewport>
+    </div>
+
+    <!-- Right: Content Slab -->
+    <div class={slabContainerStyles}>
+      <ContentSlab
+        eyebrow={currentBeat.subtitle}
+        description={currentBeat.text}
+      />
     </div>
   </div>
 
-  <!-- Progress (clickable) -->
-  <div class={progressStyles} data-animate="text">
+  <!-- Bar Progress Indicators -->
+  <div class={barContainerStyles}>
     {#each beats as beat, i}
       <button
         type="button"
-        class={dotStyles}
-        data-active={i === activeBeat}
-        onclick={() => handleDotClick(i)}
+        class={barStyles}
+        style="width: {i === activeIndex ? '32px' : '12px'};"
+        data-active={i === activeIndex}
+        onclick={() => handleBarSelect(i)}
         aria-label="View {beat.subtitle}"
-        aria-current={i === activeBeat ? 'step' : undefined}
+        aria-current={i === activeIndex ? 'step' : undefined}
       ></button>
     {/each}
   </div>
+
+  <!-- Scroll Hint -->
+  <ScrollHint />
 </div>
