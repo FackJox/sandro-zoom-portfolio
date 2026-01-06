@@ -18,16 +18,22 @@
 
   let {
     headline = 'If you have a story to tell please get in touch.',
-    phone = '+44 7880 352909',
-    email = 'sandro@sandrogh.com'
+    phone = '+447880352909',
+    email = 'sandro.gromen-hayes@live.com'
   }: Props = $props()
 
   const containerStyles = css({
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    textAlign: 'center',
     maxWidth: '500px',
     padding: '2rem',
+
+    '@media (max-width: 767px)': {
+      maxWidth: '100%',
+      padding: '1.5rem',
+    },
   })
 
   // Headline
@@ -40,41 +46,32 @@
     margin: '0 0 2rem 0',
   })
 
+  // Divider
+  const dividerStyles = css({
+    width: '80px',
+    height: '1px',
+    backgroundColor: 'brand.phantom',
+    margin: '1.5rem 0',
+  })
+
   // Contact info wrapper
   const contactInfoStyles = css({
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.75rem',
-  })
-
-  // Individual contact line
-  const contactLineStyles = css({
-    display: 'flex',
     alignItems: 'center',
-    gap: '1rem',
-  })
-
-  // Label (PHONE, EMAIL)
-  const labelStyles = css({
-    fontFamily: "'IBM Plex Sans', sans-serif",
-    fontSize: '0.65rem',
-    fontWeight: '500',
-    letterSpacing: '0.2em',
-    textTransform: 'uppercase',
-    color: 'brand.phantom',
-    minWidth: '50px',
+    gap: '0.5rem',
   })
 
   // Value (actual phone/email)
   const valueStyles = css({
-    fontFamily: "'IBM Plex Mono', 'IBM Plex Sans', monospace",
-    fontSize: '0.9rem',
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 'clamp(0.85rem, 1.2vw, 1rem)',
     fontWeight: '400',
-    color: 'brand.accent',
+    color: 'brand.text',
     textDecoration: 'none',
-    transition: 'opacity 0.2s ease',
+    transition: 'color 0.2s ease',
     '&:hover': {
-      opacity: '0.8',
+      color: 'brand.accent',
     },
   })
 </script>
@@ -82,19 +79,15 @@
 <div class={containerStyles}>
   <h2 class={headlineStyles} data-animate="text">{headline}</h2>
 
+  <div class={dividerStyles}></div>
+
   <div class={contactInfoStyles}>
     {#if phone}
-      <div class={contactLineStyles} data-animate="text">
-        <span class={labelStyles}>PHONE</span>
-        <a href="tel:{phone.replace(/\s/g, '')}" class={valueStyles}>{phone}</a>
-      </div>
+      <a href="tel:{phone}" class={valueStyles} data-animate="text">{phone}</a>
     {/if}
 
     {#if email}
-      <div class={contactLineStyles} data-animate="text">
-        <span class={labelStyles}>EMAIL</span>
-        <a href="mailto:{email}" class={valueStyles}>{email}</a>
-      </div>
+      <a href="mailto:{email}" class={valueStyles} data-animate="text">{email}</a>
     {/if}
   </div>
 </div>
