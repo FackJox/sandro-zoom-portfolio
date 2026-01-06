@@ -60,6 +60,9 @@
   // Content opacity (fade out during transition)
   const contentOpacity = $derived(1 - transitionProgress)
 
+  // Content transform (slide up during transition)
+  const contentTransform = $derived(`translateY(${-transitionProgress * 30}px)`)
+
   // Overlay opacity (fade out during transition)
   const overlayOpacity = $derived(1 - transitionProgress)
 
@@ -268,10 +271,11 @@
     style:opacity={overlayOpacity}
   ></div>
 
-  <!-- Hero Content (fades out during transition) -->
+  <!-- Hero Content (fades and slides out during transition) -->
   <div
     class={contentStyles}
     style:opacity={contentOpacity}
+    style:transform={contentTransform}
   >
     <h1 class={titleStyles} data-animate="text">{title}</h1>
     <p class={taglineStyles} data-animate="text">{tagline}</p>
@@ -279,10 +283,11 @@
     <p class={secondaryStyles} data-animate="text">{secondary}</p>
   </div>
 
-  <!-- Hero Logos (fades out during transition) -->
+  <!-- Hero Logos (fades and slides out during transition) -->
   <div
     class={logosContainerStyles}
     style:opacity={contentOpacity}
+    style:transform={contentTransform}
   >
     <LogoStrip />
   </div>
