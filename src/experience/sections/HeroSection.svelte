@@ -24,7 +24,6 @@
   const title = 'sandrogh'
   const tagline = 'HIGH ALTITUDE & HOSTILE ENVIRONMENT'
   const description = "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering."
-  const secondary = "With feeling and fortitude I have the experience to bring human stories from the world's most inhumane corners."
 
   // Container - full bleed
   const containerStyles = css({
@@ -121,18 +120,6 @@
     },
   })
 
-  // Secondary description
-  const secondaryStyles = css({
-    fontFamily: "'IBM Plex Sans', sans-serif",
-    fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
-    fontWeight: '400',
-    fontStyle: 'italic',
-    lineHeight: '1.6',
-    color: 'brand.phantom',
-    marginTop: '1rem',
-    maxWidth: '550px',
-  })
-
   // Logos container - bottom positioned
   const logosContainerStyles = css({
     position: 'absolute',
@@ -172,7 +159,6 @@
     <h1 class={titleStyles} data-animate="text">{title}</h1>
     <p class={taglineStyles} data-animate="text">{tagline}</p>
     <p class={descriptionStyles} data-animate="text">{description}</p>
-    <p class={secondaryStyles} data-animate="text">{secondary}</p>
   </div>
 
   <div class={logosContainerStyles} data-hero-logos>
