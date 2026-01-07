@@ -5,3 +5,6 @@
 - grid services transitions
 - 3d camera services transitions
 - change pictures
+- dark background on portal zoom - currently turns transparent which loses its effect
+- egg roll on portal zoom outline?
+- in about, full screen images and overlayed content slab
