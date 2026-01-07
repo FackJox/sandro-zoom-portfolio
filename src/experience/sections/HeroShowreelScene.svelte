@@ -31,7 +31,6 @@
   }: Props = $props()
 
   // Copy from design spec
-  const title = 'sandrogh'
   const tagline = 'HIGH ALTITUDE & HOSTILE ENVIRONMENT'
   const description = "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering."
 
@@ -152,22 +151,11 @@
     transition: 'opacity 0.1s linear',
   })
 
-  const titleStyles = css({
-    fontFamily: "'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif",
-    fontSize: 'clamp(2.5rem, 15vw, 10rem)',
-    fontWeight: '700',
-    letterSpacing: '-0.02em',
-    lineHeight: '0.9',
-    textTransform: 'lowercase',
-    color: 'brand.accent',
+  const logoStyles = css({
+    width: '100%',
+    maxWidth: '100%',
+    height: 'auto',
     margin: '0',
-
-    '@media (min-width: 768px)': {
-      fontSize: 'clamp(3rem, 10vw, 5rem)',
-    },
-    '@media (min-width: 1024px)': {
-      fontSize: 'clamp(4rem, 12vw, 10rem)',
-    },
   })
 
   const taglineStyles = css({
@@ -265,7 +253,7 @@
     style:opacity={contentOpacity}
     style:transform={contentTransform}
   >
-    <h1 class={titleStyles} data-animate="text">{title}</h1>
+    <img src="/sandro-logo.png" alt="Sandro" class={logoStyles} data-animate="text" />
     <p class={taglineStyles} data-animate="text">{tagline}</p>
     <p class={descriptionStyles} data-animate="text">{description}</p>
   </div>
