@@ -38,6 +38,11 @@ export function registerGSAP(): void {
   CustomEase.create('portalScale', 'M0,0 C0.4,0 0.2,1 1,1')
   CustomEase.create('portalIn', 'M0,0 C0,0 0.2,1 1,1')
 
+  // Register brand physics easings
+  // From: docs/Brand Physics Archtype.md
+  CustomEase.create('ease-lock-on', 'M0,0 C0.19,1 0.22,1 1,1')
+  CustomEase.create('ease-release', 'M0,0 C0.25,0 0.35,1 1,1')
+
   // DEBUG: Verify custom easings are registered
   if (typeof window !== 'undefined') {
     console.log('[GSAP] CustomEase registered')
