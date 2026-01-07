@@ -26,7 +26,7 @@
   const lineStyles = css({
     width: '40px',
     height: '1.5px',
-    backgroundColor: 'brand.phantom',
+    backgroundColor: 'brand.accent',
   })
 
   const baseTextStyles = css({
@@ -39,7 +39,7 @@
   })
 
   const accentTextStyles = css({ color: 'brand.accent' })
-  const defaultTextStyles = css({ color: 'brand.textMuted' })
+  const defaultTextStyles = css({ color: 'brand.accent' })
 
   // Reactive style computation
   const textStyles = $derived(

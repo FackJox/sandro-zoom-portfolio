@@ -63,7 +63,7 @@
   const chevronStyles = css({
     width: '24px',
     height: '24px',
-    color: 'brand.textMuted',
+    color: 'brand.accent',
     opacity: '0.8',
 
     '@media (max-width: 767px)': {
@@ -77,7 +77,7 @@
     fontSize: '0.625rem',
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
-    color: 'brand.phantom',
+    color: 'brand.accent',
   })
 </script>
 
