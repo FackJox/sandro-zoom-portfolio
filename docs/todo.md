@@ -1,10 +1,8 @@
-- sandro logo - yellow
 - full screen and play controls on hero
 - gallery
 
-
-- change pictures
-
+- change pictures - sandro
+- social medias gallery
 
 - dark background on portal zoom, currently turns transparent which loses its effect
 - egg roll on portal zoom outline?
