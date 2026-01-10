@@ -13,11 +13,13 @@
 
   interface Props {
     aspectRatio?: '2.39/1' | '16/9' | '4/3'
+    borderColor?: string
     children: Snippet
   }
 
   let {
     aspectRatio = '2.39/1',
+    borderColor,
     children
   }: Props = $props()
 
@@ -41,6 +43,11 @@
   })
 </script>
 
-<div class={viewportStyles} style:--aspect-ratio={aspectRatio} data-bordered-viewport>
+<div
+  class={viewportStyles}
+  style:--aspect-ratio={aspectRatio}
+  style:border-color={borderColor}
+  data-bordered-viewport
+>
   {@render children()}
 </div>
