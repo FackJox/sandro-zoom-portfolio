@@ -6,7 +6,7 @@
   // Import section components
   import {
     HeroShowreelScene,
-    FilmSection,
+    FilmOverviewSection,
     // StoriesSection removed - merged into Film
     AboutSection,
     ServicesSection,
@@ -45,8 +45,8 @@
   <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
   <HeroShowreelScene />
 
-  <!-- Scene 2: Film -->
-  <FilmSection />
+  <!-- Scene 2: Film Overview -->
+  <FilmOverviewSection />
 
   <!-- Scene 3: About -->
   <AboutSection />

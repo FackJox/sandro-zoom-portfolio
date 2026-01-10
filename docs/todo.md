@@ -7,6 +7,8 @@
 - dark background on portal zoom, currently turns transparent which loses its effect
 - egg roll on portal zoom outline?
 
+- all copy media is stacked on top of each other when page first loads
+- some videos are cropped at the bottom
 
 
 - stack film and gimbal transitions

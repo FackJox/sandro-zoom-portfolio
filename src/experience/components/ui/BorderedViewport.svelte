@@ -41,6 +41,6 @@
   })
 </script>
 
-<div class={viewportStyles} style:--aspect-ratio={aspectRatio}>
+<div class={viewportStyles} style:--aspect-ratio={aspectRatio} data-bordered-viewport>
   {@render children()}
 </div>
