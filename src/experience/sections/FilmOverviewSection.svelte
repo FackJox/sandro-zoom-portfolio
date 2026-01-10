@@ -2,10 +2,19 @@
   FilmOverviewSection.svelte
 
   Scroll-driven film showcase with overview → focus → overview cycle.
-  Uses reactive scroll progress pattern (like AboutSection/HeroShowreelScene).
+  Uses GSAP timeline scrubbed to scroll with Brand Physics durations.
+
+  Timing (16s scene with 5 scenes at 80s total):
+  - Portal buffer start: 0-5% (0.8s)
+  - Film cycles: 5-95% (4 films × 3.6s each = 14.4s)
+  - Portal buffer end: 95-100% (0.8s)
+
+  Brand Physics:
+  - brand-micro: 175ms (border changes)
+  - brand-standard: 315ms (content animations)
+  - brand-cinematic: 550ms (major transitions)
 
   Design: docs/plans/2025-01-07-film-overview-section-design.md
-  Pattern: Reactive state from scroll progress, CSS-driven transitions
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
@@ -82,9 +91,15 @@
   // State
   let containerEl: HTMLElement | null = $state(null)
   let ctx: gsap.Context | null = null
+  let activeIndex = $state(0)
+  let phase = $state<'overview' | 'focus'>('overview')
 
-  // Reactive scroll progress (0-1 within this scene)
-  let scrollProgress = $state(0)
+  // Derived state
+  const currentFilm = $derived(films[activeIndex])
+  const labelText = $derived(
+    phase === 'overview' ? 'FILM' : 'FILM — HIGH ALTITUDE FEATURES'
+  )
+  const steps = films.map(f => ({ id: f.id, label: f.title }))
 
   // Mobile detection
   let isMobile = $state(false)
@@ -103,103 +118,238 @@
     return () => mql.removeEventListener('change', handler)
   })
 
-  // Derived states from scroll progress
-  // Each film gets 25% of the scroll (4 films)
-  const FILM_COUNT = films.length
-  const FILM_RANGE = 1 / FILM_COUNT // 0.25
-
-  // Which film is active (0-3)
-  const activeFilmIndex = $derived(
-    Math.min(Math.floor(scrollProgress * FILM_COUNT), FILM_COUNT - 1)
-  )
-
-  // Phase thresholds within each film's scroll range
-  // These define when transitions happen
-  const PHASE = {
-    OVERVIEW_START: 0,      // 0%
-    FOCUS_ENTER: 0.15,      // 15% - start transitioning to focus
-    FOCUS_ACTIVE: 0.30,     // 30% - fully in focus
-    FOCUS_EXIT: 0.70,       // 70% - start transitioning out
-    OVERVIEW_END: 0.85,     // 85% - back to overview
-  }
-
-  // Progress within the current film's range (0-1)
-  const filmProgress = $derived.by(() => {
-    const filmStart = activeFilmIndex * FILM_RANGE
-    const localProgress = (scrollProgress - filmStart) / FILM_RANGE
-    return Math.max(0, Math.min(1, localProgress))
-  })
-
-  // Current phase based on film progress
-  const phase = $derived.by((): 'overview' | 'focus' | 'transitioning' => {
-    if (filmProgress < PHASE.FOCUS_ENTER || filmProgress > PHASE.OVERVIEW_END) {
-      return 'overview'
-    } else if (filmProgress >= PHASE.FOCUS_ACTIVE && filmProgress <= PHASE.FOCUS_EXIT) {
-      return 'focus'
-    }
-    return 'transitioning'
-  })
-
-  // Transition progress (0 = overview, 1 = focus)
-  // Smooth interpolation between phases
-  const focusTransition = $derived.by(() => {
-    if (filmProgress <= PHASE.OVERVIEW_START) return 0
-    if (filmProgress >= PHASE.FOCUS_ACTIVE && filmProgress <= PHASE.FOCUS_EXIT) return 1
-    if (filmProgress >= PHASE.OVERVIEW_END) return 0
-
-    // Transitioning in (FOCUS_ENTER to FOCUS_ACTIVE)
-    if (filmProgress < PHASE.FOCUS_ACTIVE) {
-      return (filmProgress - PHASE.FOCUS_ENTER) / (PHASE.FOCUS_ACTIVE - PHASE.FOCUS_ENTER)
-    }
-
-    // Transitioning out (FOCUS_EXIT to OVERVIEW_END)
-    return 1 - (filmProgress - PHASE.FOCUS_EXIT) / (PHASE.OVERVIEW_END - PHASE.FOCUS_EXIT)
-  })
-
-  // Derived CSS values
-  const overviewOpacity = $derived(1 - focusTransition)
-  const focusOpacity = $derived(focusTransition)
-  const contentSlabOpacity = $derived.by(() => {
-    // Content slab appears slightly after focus, exits slightly before
-    const enterStart = PHASE.FOCUS_ACTIVE
-    const enterEnd = PHASE.FOCUS_ACTIVE + 0.10
-    const exitStart = PHASE.FOCUS_EXIT - 0.10
-    const exitEnd = PHASE.FOCUS_EXIT
-
-    if (filmProgress < enterStart) return 0
-    if (filmProgress >= enterEnd && filmProgress <= exitStart) return 1
-    if (filmProgress > exitEnd) return 0
-
-    // Entering
-    if (filmProgress < enterEnd) {
-      return (filmProgress - enterStart) / (enterEnd - enterStart)
-    }
-
-    // Exiting
-    return 1 - (filmProgress - exitStart) / (exitEnd - exitStart)
-  })
-
-  const contentSlabTransform = $derived(
-    `translateX(${(1 - contentSlabOpacity) * 30}px)`
-  )
-
-  // Current film data
-  const currentFilm = $derived(films[activeFilmIndex])
-
-  // Section label
-  const labelText = $derived(
-    phase === 'overview' ? 'FILM' : 'FILM — HIGH ALTITUDE FEATURES'
-  )
-
-  // Step indicator data
-  const steps = films.map(f => ({ id: f.id, label: f.title }))
-
   // Cleanup
   onDestroy(() => {
     ctx?.revert()
   })
 
-  // Initialize ScrollTrigger
+  /**
+   * Build the scroll-driven timeline for film overview transitions.
+   * Timeline uses proportional positioning (0-1) to work with any scroll duration.
+   *
+   * Brand Physics durations (as proportions of 16s scene):
+   * - brand-micro: 0.175s / 16s ≈ 0.011
+   * - brand-standard: 0.315s / 16s ≈ 0.02
+   * - brand-cinematic: 0.55s / 16s ≈ 0.034
+   *
+   * Structure:
+   * - 0-5%: Portal in buffer
+   * - 5-95%: 4 film cycles (22.5% each)
+   * - 95-100%: Portal out buffer
+   */
+  function buildFilmTimeline(container: HTMLElement, mobile: boolean): gsap.core.Timeline {
+    const tl = gsap.timeline()
+
+    const filmFrames = container.querySelectorAll('[data-film]')
+    const focusLayout = container.querySelector('[data-focus-layout]')
+    const contentSlab = container.querySelector('[data-content-slab]')
+    const overviewGrid = container.querySelector('[data-overview-grid]')
+
+    // Timeline proportions (0-1)
+    const PORTAL_BUFFER = 0.05 // 5% at start and end for portal transitions
+    const ACTIVE_START = PORTAL_BUFFER
+    const ACTIVE_END = 1 - PORTAL_BUFFER
+    const ACTIVE_RANGE = ACTIVE_END - ACTIVE_START // 90%
+
+    // Each film gets equal share of active range
+    const FILM_RANGE = ACTIVE_RANGE / films.length // 22.5% each
+
+    // Brand Physics durations as proportions (assuming 16s scene)
+    const SCENE_DURATION = 16 // seconds
+    const MICRO = DURATION.micro / SCENE_DURATION
+    const STANDARD = DURATION.standard / SCENE_DURATION
+    const CINEMATIC = DURATION.cinematic / SCENE_DURATION
+
+    // Initialize all elements
+    if (focusLayout) gsap.set(focusLayout, { autoAlpha: 0 })
+    if (contentSlab) {
+      gsap.set(contentSlab, {
+        autoAlpha: 0,
+        x: mobile ? 0 : 40,
+        y: mobile ? 30 : 0
+      })
+    }
+
+    // Build animation for each film
+    films.forEach((film, filmIndex) => {
+      const cycleStart = ACTIVE_START + (filmIndex * FILM_RANGE)
+      const currentFrame = filmFrames[filmIndex] as HTMLElement
+      const otherFrames = Array.from(filmFrames).filter((_, i) => i !== filmIndex) as HTMLElement[]
+
+      const currentBorder = currentFrame?.querySelector('[data-bordered-viewport]') as HTMLElement
+      const otherBorders = otherFrames.map(f => f.querySelector('[data-bordered-viewport]') as HTMLElement)
+
+      // Film cycle phases (relative to film's range)
+      // Each film cycle: 0-100% of its FILM_RANGE
+      const PHASES = {
+        HOLD_START: 0.05,        // 5% hold at start
+        BORDER_FADE: 0.10,       // Border accent change
+        OTHERS_EXIT: 0.15,       // Others start fading
+        LAYOUT_SHIFT: 0.25,      // Switch to focus layout
+        CONTENT_ENTER: 0.35,     // Content slab enters
+        CONTENT_HOLD: 0.60,      // Reading time
+        CONTENT_EXIT: 0.65,      // Content starts leaving
+        LAYOUT_RESET: 0.75,      // Return to overview
+        OTHERS_RETURN: 0.80,     // Others fade back in
+        ACCENT_SHIFT: 0.90,      // Prepare for next film
+      }
+
+      // Convert phase to absolute timeline position
+      const pos = (p: number) => cycleStart + (p * FILM_RANGE)
+
+      // PHASE 1: Border accent to current film
+      if (currentBorder) {
+        tl.to(currentBorder, {
+          borderColor: '#f6c605',
+          duration: MICRO,
+          ease: 'ease-lock-on',
+        }, pos(PHASES.BORDER_FADE))
+      }
+
+      // Dim other borders
+      otherBorders.forEach(border => {
+        if (border) {
+          tl.to(border, {
+            borderColor: '#707977',
+            duration: MICRO,
+            ease: 'ease-lock-on',
+          }, pos(PHASES.BORDER_FADE))
+        }
+      })
+
+      // PHASE 2: Others exit
+      otherFrames.forEach(frame => {
+        if (mobile) {
+          tl.to(frame, {
+            scale: 0.9,
+            y: -30,
+            autoAlpha: 0,
+            duration: CINEMATIC,
+            ease: 'ease-release',
+          }, pos(PHASES.OTHERS_EXIT))
+        } else {
+          tl.to(frame, {
+            scale: 0.85,
+            autoAlpha: 0,
+            duration: CINEMATIC,
+            ease: 'ease-release',
+          }, pos(PHASES.OTHERS_EXIT))
+        }
+      })
+
+      // PHASE 3: Layout shift to focus
+      if (overviewGrid) {
+        tl.to(overviewGrid, {
+          autoAlpha: 0,
+          duration: CINEMATIC,
+          ease: 'ease-release',
+        }, pos(PHASES.LAYOUT_SHIFT))
+      }
+
+      if (focusLayout) {
+        tl.to(focusLayout, {
+          autoAlpha: 1,
+          duration: CINEMATIC,
+          ease: 'ease-lock-on',
+        }, pos(PHASES.LAYOUT_SHIFT) + CINEMATIC * 0.5)
+      }
+
+      // Update state
+      tl.call(() => {
+        phase = 'focus'
+        activeIndex = filmIndex
+      }, [], pos(PHASES.LAYOUT_SHIFT) + CINEMATIC)
+
+      // PHASE 4: Content slab enters
+      if (contentSlab) {
+        tl.to(contentSlab, {
+          autoAlpha: 1,
+          x: 0,
+          y: 0,
+          duration: STANDARD,
+          ease: 'ease-lock-on',
+        }, pos(PHASES.CONTENT_ENTER))
+      }
+
+      // PHASE 5: Content slab exits
+      if (contentSlab) {
+        tl.to(contentSlab, {
+          autoAlpha: 0,
+          x: mobile ? 0 : 40,
+          y: mobile ? 30 : 0,
+          duration: STANDARD,
+          ease: 'ease-release',
+        }, pos(PHASES.CONTENT_EXIT))
+      }
+
+      // PHASE 6: Layout reset to overview
+      if (focusLayout) {
+        tl.to(focusLayout, {
+          autoAlpha: 0,
+          duration: CINEMATIC,
+          ease: 'ease-release',
+        }, pos(PHASES.LAYOUT_RESET))
+      }
+
+      if (overviewGrid) {
+        tl.to(overviewGrid, {
+          autoAlpha: 1,
+          duration: CINEMATIC,
+          ease: 'ease-lock-on',
+        }, pos(PHASES.LAYOUT_RESET) + CINEMATIC * 0.5)
+      }
+
+      tl.call(() => {
+        phase = 'overview'
+      }, [], pos(PHASES.LAYOUT_RESET) + CINEMATIC)
+
+      // PHASE 7: Others return
+      otherFrames.forEach(frame => {
+        if (mobile) {
+          tl.to(frame, {
+            scale: 1,
+            y: 0,
+            autoAlpha: 1,
+            duration: CINEMATIC,
+            ease: 'ease-lock-on',
+          }, pos(PHASES.OTHERS_RETURN))
+        } else {
+          tl.to(frame, {
+            scale: 1,
+            autoAlpha: 1,
+            duration: CINEMATIC,
+            ease: 'ease-lock-on',
+          }, pos(PHASES.OTHERS_RETURN))
+        }
+      })
+
+      // PHASE 8: Accent shift to next film
+      if (filmIndex < films.length - 1) {
+        const nextFrame = filmFrames[filmIndex + 1] as HTMLElement
+        const nextBorder = nextFrame?.querySelector('[data-bordered-viewport]') as HTMLElement
+
+        if (currentBorder) {
+          tl.to(currentBorder, {
+            borderColor: '#707977',
+            duration: MICRO,
+            ease: 'ease-release',
+          }, pos(PHASES.ACCENT_SHIFT))
+        }
+
+        if (nextBorder) {
+          tl.to(nextBorder, {
+            borderColor: '#f6c605',
+            duration: MICRO,
+            ease: 'ease-lock-on',
+          }, pos(PHASES.ACCENT_SHIFT))
+        }
+      }
+    })
+
+    return tl
+  }
+
+  // Initialize and connect to ScrollTrigger
   onMount(() => {
     if (!containerEl) return
 
@@ -223,15 +373,19 @@
     const sectionStart = sectionIndex * sceneHeight
     const sectionEnd = (sectionIndex + 1) * sceneHeight
 
+    const isMobileNow = typeof window !== 'undefined'
+      && window.matchMedia('(max-width: 767px)').matches
+
     ctx = gsap.context(() => {
+      const tl = buildFilmTimeline(containerEl!, isMobileNow)
+
       ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `top+=${sectionEnd} top`,
-        scrub: true,
-        onUpdate: (self) => {
-          scrollProgress = self.progress
-        },
+        scrub: 1,
+        invalidateOnRefresh: true,
+        animation: tl,
       })
     }, containerEl)
   })
@@ -275,7 +429,6 @@
     gap: '1.5rem',
     padding: '12vh 8vw',
     alignItems: 'center',
-    transition: `opacity ${DURATION.cinematic}s cubic-bezier(0.25, 0, 0.35, 1)`,
 
     '@media (max-width: 767px)': {
       gridTemplateColumns: '1fr',
@@ -288,7 +441,6 @@
   const filmFrameStyles = css({
     position: 'relative',
     width: '100%',
-    transition: `all ${DURATION.cinematic}s cubic-bezier(0.19, 1, 0.22, 1)`,
   })
 
   const overlayStyles = css({
@@ -334,7 +486,7 @@
     gap: '2rem',
     padding: '12vh 8vw',
     boxSizing: 'border-box',
-    transition: `opacity ${DURATION.cinematic}s cubic-bezier(0.19, 1, 0.22, 1)`,
+    pointerEvents: 'none',
 
     '@media (max-width: 1023px)': {
       gridTemplateColumns: '0.55fr 0.45fr',
@@ -358,25 +510,7 @@
   const focusSlabContainerStyles = css({
     display: 'flex',
     alignItems: 'center',
-    transition: `opacity ${DURATION.standard}s cubic-bezier(0.19, 1, 0.22, 1), transform ${DURATION.standard}s cubic-bezier(0.19, 1, 0.22, 1)`,
   })
-
-  // Helper to get border color based on active state
-  function getBorderStyle(index: number): string {
-    return index === activeFilmIndex ? '#f6c605' : '#707977'
-  }
-
-  // Helper to get frame scale/opacity for non-active films during transition
-  function getFrameStyle(index: number): { opacity: number; scale: number } {
-    if (index === activeFilmIndex) {
-      return { opacity: 1, scale: 1 }
-    }
-    // Other frames fade and scale down during focus transition
-    return {
-      opacity: 1 - focusTransition * 0.7,
-      scale: 1 - focusTransition * 0.1,
-    }
-  }
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="film-overview">
@@ -386,25 +520,14 @@
   </div>
 
   <!-- Overview Grid (all 4 films) -->
-  <div
-    class={overviewGridStyles}
-    style:opacity={overviewOpacity}
-    style:pointer-events={overviewOpacity < 0.5 ? 'none' : 'auto'}
-    data-overview-grid
-  >
+  <div class={overviewGridStyles} data-overview-grid>
     {#each films as film, i}
-      {@const frameStyle = getFrameStyle(i)}
       <div
         class={filmFrameStyles}
-        style:opacity={frameStyle.opacity}
-        style:transform="scale({frameStyle.scale})"
         data-film={film.id}
         data-index={i}
       >
-        <BorderedViewport
-          aspectRatio={isMobile ? '16/9' : '2.39/1'}
-          borderColor={getBorderStyle(i)}
-        >
+        <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
           {#if film.media.type === 'youtube'}
             <img
               src={`https://img.youtube.com/vi/${film.media.src.split('/').pop()}/maxresdefault.jpg`}
@@ -432,12 +555,7 @@
   </div>
 
   <!-- Focus Layout (shown during focus state) -->
-  <div
-    class={focusLayoutStyles}
-    style:opacity={focusOpacity}
-    style:pointer-events={focusOpacity < 0.5 ? 'none' : 'auto'}
-    data-focus-layout
-  >
+  <div class={focusLayoutStyles} data-focus-layout>
     <div class={focusViewportContainerStyles}>
       <BorderedViewport aspectRatio="2.39/1" borderColor="#f6c605">
         {#if currentFilm.media.type === 'youtube'}
@@ -467,12 +585,7 @@
         {/if}
       </BorderedViewport>
     </div>
-    <div
-      class={focusSlabContainerStyles}
-      style:opacity={contentSlabOpacity}
-      style:transform={contentSlabTransform}
-      data-content-slab
-    >
+    <div class={focusSlabContainerStyles} data-content-slab>
       <ContentSlab
         eyebrow={currentFilm.client}
         title={currentFilm.title}
@@ -486,7 +599,7 @@
   <div class={indicatorContainerStyles}>
     <StepIndicator
       {steps}
-      activeIndex={activeFilmIndex}
+      {activeIndex}
       showLabels={true}
     />
   </div>

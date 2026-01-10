@@ -37,7 +37,7 @@
 </svelte:head>
 
 <PortalContainer
-  totalDuration={36}
+  totalDuration={80}
   scrollSpeed={65}
   markers={false}
   debug={false}
