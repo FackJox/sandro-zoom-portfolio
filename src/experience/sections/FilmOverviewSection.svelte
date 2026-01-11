@@ -153,13 +153,14 @@
     const tl = gsap.timeline()
 
     const filmFrames = container.querySelectorAll('[data-film]') as NodeListOf<HTMLElement>
+    const focusLayout = container.querySelector('[data-focus-layout]') as HTMLElement
     const contentSlabContainer = container.querySelector('[data-content-slab-container]') as HTMLElement
     const contentSlab = container.querySelector('[data-content-slab]') as HTMLElement
     const overviewGrid = container.querySelector('[data-overview-grid]') as HTMLElement
     const labelTextElement = container.querySelector('[data-section-label-text]') as HTMLElement
 
     // DIAGNOSTIC: Log all queried elements (flat)
-    console.log(`[FilmOverview] buildFilmTimeline - filmFrames=${filmFrames.length} ids=[${Array.from(filmFrames).map(f => f.dataset.film).join(',')}] contentSlabContainer=${!!contentSlabContainer} contentSlab=${!!contentSlab} overviewGrid=${!!overviewGrid} labelTextElement=${!!labelTextElement} mobile=${mobile}`)
+    console.log(`[FilmOverview] buildFilmTimeline - filmFrames=${filmFrames.length} ids=[${Array.from(filmFrames).map(f => f.dataset.film).join(',')}] focusLayout=${!!focusLayout} contentSlabContainer=${!!contentSlabContainer} contentSlab=${!!contentSlab} overviewGrid=${!!overviewGrid} labelTextElement=${!!labelTextElement} mobile=${mobile}`)
 
     // DIAGNOSTIC: Log each film frame's computed position (flat)
     filmFrames.forEach((frame, i) => {
@@ -202,16 +203,19 @@
     const CINEMATIC = DURATION.cinematic / SCENE_DURATION
 
     // Initialize all elements - start with opacity 0 for fadeIn
-    console.log('[FilmOverview] Initializing element states (autoAlpha: 0, scale: 0.95)')
+    console.log('[FilmOverview] Initializing element states (autoAlpha: 0, scale: 0.95, width: 100%)')
     filmFrames.forEach((frame, i) => {
-      gsap.set(frame, { autoAlpha: 0, scale: 0.95 })
-      console.log(`[FilmOverview] Set film frame ${i} to autoAlpha: 0, scale: 0.95`)
+      gsap.set(frame, { autoAlpha: 0, scale: 0.95, width: '100%' })
+      console.log(`[FilmOverview] Set film frame ${i} to autoAlpha: 0, scale: 0.95, width: 100%`)
     })
 
-    if (contentSlabContainer) {
-      gsap.set(contentSlabContainer, { autoAlpha: 0, pointerEvents: 'none' })
-      console.log('[FilmOverview] Set contentSlabContainer to autoAlpha: 0')
+    // Initialize focus layout (hidden initially, shown during focus state)
+    if (focusLayout) {
+      gsap.set(focusLayout, { autoAlpha: 0, pointerEvents: 'none' })
+      console.log('[FilmOverview] Set focusLayout to autoAlpha: 0')
     }
+
+    // Initialize content slab within focus layout (offset for enter animation)
     if (contentSlab) {
       gsap.set(contentSlab, {
         autoAlpha: 0,
@@ -277,12 +281,8 @@
         ACCENT_SHIFT: 0.800,     // 7.2s/9s - Prepare for next film
       }
 
-      // Get thumbnail, video player layers, and overlay for crossfade
-      const currentThumbnail = currentFrame?.querySelector('[data-thumbnail]') as HTMLElement
-      const currentVideoPlayer = currentFrame?.querySelector('[data-video-player]') as HTMLElement
-      const currentOverlay = currentFrame?.querySelector('[data-film-overlay]') as HTMLElement
-
-      console.log(`[FilmOverview] Film ${filmIndex} layers: thumbnail=${!!currentThumbnail} videoPlayer=${!!currentVideoPlayer} overlay=${!!currentOverlay}`)
+      // Note: In the grid-based layout, we transition between overview grid and focus layout
+      // rather than crossfading thumbnail/video within each frame
 
       // Convert phase to absolute timeline position
       const pos = (p: number) => cycleStart + (p * FILM_RANGE)
@@ -333,89 +333,55 @@
       })
 
       // PHASE 3: Label scramble text transition
+      // Note: Remove 'speed' param so GSAP uses our explicit duration, not calculated from text length
       if (labelTextElement) {
         tl.to(labelTextElement, {
           text: {
             value: 'FILM — HIGH ALTITUDE FEATURES',
             delimiter: '',
-            speed: 1,
           },
-          duration: STANDARD * 2,
+          duration: CINEMATIC,
           ease: 'none',
           onStart: () => { phase = 'transition' }
         }, pos(PHASES.LABEL_SCRAMBLE))
       }
 
-      // PHASE 4: Layout shift using Flip-style animation
-      // Capture current state and animate to focus position
-      if (overviewGrid) {
-        // Animate grid to single-column focus layout
-        tl.to(overviewGrid, {
-          gridTemplateColumns: mobile ? '1fr' : '1fr',
-          gap: mobile ? '1.5rem' : '2rem',
-          duration: CINEMATIC,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_SHIFT))
-      }
+      // PHASE 4: Layout shift - transition from overview grid to focus layout
+      // The focus layout is a separate CSS Grid with proper 60/40 split
+      // Fade out all thumbnails and fade in the focus layout
 
-      // Animate focused frame to full width
-      if (currentFrame) {
-        tl.to(currentFrame, {
-          gridColumn: '1 / -1',
-          maxWidth: mobile ? '100%' : '60%',
-          duration: CINEMATIC,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_SHIFT))
-      }
+      // Update state first so currentFilm updates in the focus layout
+      tl.call(() => {
+        activeIndex = filmIndex
+        console.log(`[FilmOverview] Film ${filmIndex} activeIndex set, currentFilm updated`)
+      }, [], pos(PHASES.LAYOUT_SHIFT))
 
-      // Show content slab container
-      if (contentSlabContainer) {
-        tl.to(contentSlabContainer, {
+      // Fade out all film frames (overview thumbnails)
+      filmFrames.forEach((frame, i) => {
+        tl.to(frame, {
+          autoAlpha: 0,
+          scale: 0.95,
+          duration: CINEMATIC,
+          ease: 'ease-release',
+        }, pos(PHASES.LAYOUT_SHIFT))
+      })
+
+      // Fade in the focus layout (contains video + ContentSlab in grid)
+      if (focusLayout) {
+        tl.to(focusLayout, {
           autoAlpha: 1,
           pointerEvents: 'auto',
-          duration: CINEMATIC * 0.5,
+          duration: CINEMATIC,
           ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_SHIFT) + CINEMATIC * 0.5)
+        }, pos(PHASES.LAYOUT_SHIFT) + CINEMATIC * 0.3)
+
+        console.log(`[FilmOverview] Film ${filmIndex} focus layout IN at pos=${pos(PHASES.LAYOUT_SHIFT).toFixed(3)}`)
       }
 
-      // Update state
+      // Update phase state
       tl.call(() => {
         phase = 'focus'
-        activeIndex = filmIndex
       }, [], pos(PHASES.LAYOUT_SHIFT) + CINEMATIC)
-
-      // PHASE 4b: Crossfade from thumbnail to video player
-      // This creates a seamless transition as the layout expands
-      if (currentThumbnail && currentVideoPlayer) {
-        // First make video player visible (but still transparent)
-        tl.set(currentVideoPlayer, {
-          visibility: 'visible',
-        }, pos(PHASES.CROSSFADE_IN))
-
-        // Crossfade: thumbnail out, video player in
-        tl.to(currentThumbnail, {
-          autoAlpha: 0,
-          duration: STANDARD,
-          ease: 'ease-release',
-        }, pos(PHASES.CROSSFADE_IN))
-
-        tl.to(currentVideoPlayer, {
-          autoAlpha: 1,
-          duration: STANDARD,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.CROSSFADE_IN))
-
-        console.log(`[FilmOverview] Film ${filmIndex} crossfade IN at pos=${pos(PHASES.CROSSFADE_IN).toFixed(3)}`)
-      }
-
-      // Hide overlay during focus (ContentSlab shows the info instead)
-      if (currentOverlay) {
-        tl.to(currentOverlay, {
-          autoAlpha: 0,
-          duration: STANDARD,
-          ease: 'ease-release',
-        }, pos(PHASES.CROSSFADE_IN))
-      }
 
       // PHASE 5: Content slab enters
       if (contentSlab) {
@@ -439,98 +405,40 @@
         }, pos(PHASES.CONTENT_EXIT))
       }
 
-      // PHASE 6b: Crossfade from video player back to thumbnail
-      // Reverse the crossfade before layout resets to overview
-      if (currentThumbnail && currentVideoPlayer) {
-        // Crossfade: video player out, thumbnail in
-        tl.to(currentVideoPlayer, {
-          autoAlpha: 0,
-          duration: STANDARD,
-          ease: 'ease-release',
-        }, pos(PHASES.CROSSFADE_OUT))
+      // PHASE 7: Layout reset - transition from focus layout back to overview grid
+      // Fade out focus layout and fade in all film frames
 
-        tl.to(currentThumbnail, {
-          autoAlpha: 1,
-          duration: STANDARD,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.CROSSFADE_OUT))
-
-        // Hide video player after crossfade
-        tl.set(currentVideoPlayer, {
-          visibility: 'hidden',
-        }, pos(PHASES.CROSSFADE_OUT) + STANDARD)
-
-        console.log(`[FilmOverview] Film ${filmIndex} crossfade OUT at pos=${pos(PHASES.CROSSFADE_OUT).toFixed(3)}`)
-      }
-
-      // Show overlay again during reverse crossfade
-      if (currentOverlay) {
-        tl.to(currentOverlay, {
-          autoAlpha: 1,
-          duration: STANDARD,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.CROSSFADE_OUT))
-      }
-
-      // PHASE 7: Layout reset
-      if (contentSlabContainer) {
-        tl.to(contentSlabContainer, {
+      // Fade out the focus layout
+      if (focusLayout) {
+        tl.to(focusLayout, {
           autoAlpha: 0,
           pointerEvents: 'none',
-          duration: CINEMATIC * 0.5,
+          duration: CINEMATIC,
           ease: 'ease-release',
         }, pos(PHASES.LAYOUT_RESET))
+
+        console.log(`[FilmOverview] Film ${filmIndex} focus layout OUT at pos=${pos(PHASES.LAYOUT_RESET).toFixed(3)}`)
       }
 
-      // Reset grid to 4-column layout
-      if (overviewGrid) {
-        tl.to(overviewGrid, {
-          gridTemplateColumns: mobile ? '1fr' : 'repeat(4, 1fr)',
-          gap: mobile ? '1rem' : '1.5rem',
+      // Fade in all film frames (overview thumbnails)
+      filmFrames.forEach((frame, i) => {
+        tl.to(frame, {
+          autoAlpha: 1,
+          scale: 1,
           duration: CINEMATIC,
           ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_RESET))
-      }
-
-      // Reset focused frame
-      if (currentFrame) {
-        tl.to(currentFrame, {
-          gridColumn: 'auto',
-          maxWidth: '100%',
-          duration: CINEMATIC,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_RESET))
-      }
-
-      // PHASE 8: Others return
-      otherFrames.forEach(frame => {
-        if (mobile) {
-          tl.to(frame, {
-            scale: 1,
-            y: 0,
-            autoAlpha: 1,
-            duration: CINEMATIC,
-            ease: 'ease-lock-on',
-          }, pos(PHASES.OTHERS_RETURN))
-        } else {
-          tl.to(frame, {
-            scale: 1,
-            autoAlpha: 1,
-            duration: CINEMATIC,
-            ease: 'ease-lock-on',
-          }, pos(PHASES.OTHERS_RETURN))
-        }
+        }, pos(PHASES.OTHERS_RETURN))
       })
 
       // PHASE 9: Label reset back to "FILM"
+      // Note: Remove 'speed' param so GSAP uses our explicit duration
       if (labelTextElement) {
         tl.to(labelTextElement, {
           text: {
             value: 'FILM',
             delimiter: '',
-            speed: 1,
           },
-          duration: STANDARD,
+          duration: MICRO,
           ease: 'none',
         }, pos(PHASES.LABEL_RESET))
       }
@@ -584,6 +492,18 @@
         })
       }
     })
+
+    // DEBUG: Log final timeline structure
+    const children = tl.getChildren()
+    console.log(`[FilmOverview] buildFilmTimeline complete: totalDuration=${tl.duration().toFixed(4)}s childAnimations=${children.length}`)
+    children.slice(0, 10).forEach((child, i) => {
+      const startTime = child.startTime?.() ?? 0
+      const duration = child.duration?.() ?? 0
+      console.log(`[FilmOverview] Animation ${i}: start=${startTime.toFixed(4)}s duration=${duration.toFixed(4)}s end=${(startTime + duration).toFixed(4)}s`)
+    })
+    if (children.length > 10) {
+      console.log(`[FilmOverview] ... and ${children.length - 10} more animations`)
+    }
 
     return tl
   }
@@ -658,18 +578,22 @@
     ctx = gsap.context(() => {
       const tl = buildFilmTimeline(containerEl!, isMobileNow)
 
-      ScrollTrigger.create({
+      // DEBUG: Log timeline details
+      console.log(`[FilmOverview] Timeline built: duration=${tl.duration().toFixed(4)}s labels=${Object.keys(tl.labels || {}).join(',')} children=${tl.getChildren().length}`)
+
+      const scrollRange = sectionEnd - sectionStart
+      const st = ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
-        end: `top+=${sectionEnd} top`,
+        end: `+=${scrollRange}`,
         scrub: 1,
         invalidateOnRefresh: true,
         animation: tl,
         onUpdate: (self) => {
-          // Log every 10% progress
+          // Log every 10% progress with timeline position
           const progress = Math.round(self.progress * 100)
           if (progress % 10 === 0) {
-            console.log(`[FilmOverview] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
+            console.log(`[FilmOverview] progress=${progress}% scroll=${Math.round(self.scroll())}px tlProgress=${(tl.progress() * 100).toFixed(1)}% tlTime=${tl.time().toFixed(4)}s`)
           }
         },
         onEnter: () => console.log(`[FilmOverview] ENTER scroll=${window.scrollY}px`),
@@ -677,6 +601,9 @@
         onEnterBack: () => console.log(`[FilmOverview] ENTER_BACK scroll=${window.scrollY}px`),
         onLeaveBack: () => console.log(`[FilmOverview] LEAVE_BACK scroll=${window.scrollY}px`),
       })
+
+      // DEBUG: Log ScrollTrigger details
+      console.log(`[FilmOverview] ScrollTrigger created: sectionStart=${sectionStart} sectionEnd=${sectionEnd} scrollRange=${scrollRange} st.start=${st.start} st.end=${st.end} trigger=${portalContainer?.tagName}`)
     }, containerEl)
   })
 
@@ -725,7 +652,6 @@
       gridTemplateColumns: '1fr',
       gap: '1rem',
       padding: '14vh 4vw 16vh',
-      overflowY: 'auto',
       alignContent: 'start',
     },
   })
@@ -733,7 +659,7 @@
   const filmFrameStyles = css({
     position: 'relative',
     width: '100%',
-    transformOrigin: 'center center',
+    transformOrigin: 'left center',
   })
 
   // Layered media container - holds both thumbnail and video player
@@ -747,7 +673,7 @@
   const thumbnailLayerStyles = css({
     position: 'absolute',
     inset: '0',
-    zIndex: '2',
+    zIndex: '1',
     '& img, & video': {
       display: 'block',
       width: '100%',
@@ -757,11 +683,11 @@
   })
 
   // Video player layer - hidden initially, fades in during focus
-  // Positioned absolute behind thumbnail, becomes visible during crossfade
+  // Positioned absolute above thumbnail for proper crossfade
   const videoPlayerLayerStyles = css({
     position: 'absolute',
     inset: '0',
-    zIndex: '1',
+    zIndex: '2',
     opacity: '0',
     visibility: 'hidden',
     '& iframe, & video, & a': {
@@ -809,6 +735,7 @@
     display: 'flex',
     flexDirection: 'column',
     gap: '0.25rem',
+    zIndex: '10', // Above thumbnail and video layers
   })
 
   const filmTitleStyles = css({
@@ -833,31 +760,45 @@
     textTransform: 'uppercase',
   })
 
-  // Content slab container - overlays during focus state
-  const contentSlabContainerStyles = css({
+  // Focus layout grid - 60/40 split on desktop, stacked on mobile
+  const focusLayoutStyles = css({
     position: 'absolute',
-    top: '50%',
-    right: '8vw',
-    transform: 'translateY(-50%)',
-    width: '35%',
-    maxWidth: '400px',
-    zIndex: '5',
+    inset: '0',
+    display: 'grid',
+    gridTemplateColumns: '3fr 2fr', // 60% / 40% split
+    gap: '2rem',
+    padding: '12vh 8vw',
+    alignItems: 'center',
+    opacity: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    zIndex: '20',
 
     '@media (max-width: 1023px)': {
-      width: '40%',
-      right: '6vw',
+      gridTemplateColumns: '1.1fr 1fr', // 52% / 48% on tablet
+      gap: '1.5rem',
+      padding: '12vh 6vw',
     },
 
     '@media (max-width: 767px)': {
-      position: 'absolute',
-      top: 'auto',
-      bottom: '16vh',
-      left: '4vw',
-      right: '4vw',
-      transform: 'none',
-      width: 'auto',
-      maxWidth: 'none',
+      gridTemplateColumns: '1fr',
+      gridTemplateRows: 'auto auto',
+      gap: '1.5rem',
+      padding: '14vh 4vw 20vh',
+      alignContent: 'center',
     },
+  })
+
+  // Focus video container - holds the video in focus state
+  const focusVideoContainerStyles = css({
+    position: 'relative',
+    width: '100%',
+  })
+
+  // Content slab container - inside focus layout grid
+  const contentSlabContainerStyles = css({
+    position: 'relative',
+    width: '100%',
   })
 </script>
 
@@ -939,15 +880,55 @@
     {/each}
   </div>
 
-  <!-- Content Slab Container (slides in during focus) -->
-  <div class={contentSlabContainerStyles} data-content-slab-container>
-    <div data-content-slab>
-      <ContentSlab
-        eyebrow={currentFilm.client}
-        title={currentFilm.title}
-        description={currentFilm.description}
-        year={currentFilm.year}
-      />
+  <!-- Focus Layout Grid (appears during focus state) -->
+  <div class={focusLayoutStyles} data-focus-layout>
+    <!-- Video Container -->
+    <div class={focusVideoContainerStyles} data-focus-video>
+      <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
+        <!-- Render current film's video content -->
+        {#if currentFilm.media.type === 'youtube'}
+          <iframe
+            src={currentFilm.media.src}
+            title={currentFilm.title}
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        {:else if currentFilm.media.type === 'video'}
+          <video
+            src={currentFilm.media.src}
+            autoplay
+            loop
+            muted
+            playsinline
+          ></video>
+        {:else if currentFilm.media.type === 'image'}
+          {#if currentFilm.media.externalLink}
+            <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
+              <img src={currentFilm.media.src} alt={currentFilm.title} />
+              <div class={playOverlayStyles}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="white">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+            </a>
+          {:else}
+            <img src={currentFilm.media.src} alt={currentFilm.title} />
+          {/if}
+        {/if}
+      </BorderedViewport>
+    </div>
+
+    <!-- Content Slab Container -->
+    <div class={contentSlabContainerStyles} data-content-slab-container>
+      <div data-content-slab>
+        <ContentSlab
+          eyebrow={currentFilm.client}
+          title={currentFilm.title}
+          description={currentFilm.description}
+          year={currentFilm.year}
+        />
+      </div>
     </div>
   </div>
 
