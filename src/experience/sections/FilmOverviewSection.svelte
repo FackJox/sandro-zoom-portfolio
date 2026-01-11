@@ -41,6 +41,8 @@
     media: {
       type: 'youtube' | 'video' | 'image'
       src: string
+      srcWebm?: string    // AV1/WebM optimized version
+      srcHevc?: string    // HEVC/MP4 optimized version
       poster?: string
       externalLink?: string
     }
@@ -78,7 +80,9 @@
       description: 'I directed, shot and edited the story of Grace, a recovering climber searching for a bigger life. Focusing on mental health and community the film was supported by Montane and played at film festivals world wide.',
       media: {
         type: 'video',
-        src: '/videos/grace.mp4'
+        src: '/videos/grace.mp4',
+        srcWebm: '/videos/grace.av1.webm',
+        srcHevc: '/videos/grace.hevc.mp4'
       }
     },
     {
@@ -89,7 +93,9 @@
       description: 'Filmed during one of six trips to Afghanistan this commercial for Charles Schwab bank depicts preparation for our record breaking expedition to Mt Noshaq, the countries highest peak at 7,495m.',
       media: {
         type: 'video',
-        src: '/videos/shwab.mp4'
+        src: '/videos/shwab.mp4',
+        srcWebm: '/videos/shwab.av1.webm',
+        srcHevc: '/videos/shwab.hevc.mp4'
       }
     },
   ]
@@ -648,6 +654,14 @@
     alignItems: 'center',
     alignContent: 'center',
 
+    // Tablet (768-1023px) - 2x2 grid for better visibility
+    '@media (max-width: 1023px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '1.25rem',
+      padding: '12vh 6vw',
+    },
+
+    // Mobile (<768px) - single column stack
     '@media (max-width: 767px)': {
       gridTemplateColumns: '1fr',
       gap: '1rem',
@@ -760,7 +774,7 @@
     textTransform: 'uppercase',
   })
 
-  // Focus layout grid - 60/40 split on desktop, stacked on mobile
+  // Focus layout grid - 60/40 split on desktop, stacked on tablet/mobile
   const focusLayoutStyles = css({
     position: 'absolute',
     inset: '0',
@@ -773,13 +787,25 @@
     visibility: 'hidden',
     pointerEvents: 'none',
     zIndex: '20',
+    overflow: 'visible', // Ensure content doesn't get clipped
 
-    '@media (max-width: 1023px)': {
-      gridTemplateColumns: '1.1fr 1fr', // 52% / 48% on tablet
+    // Large tablet (1024-1279px) - slightly adjusted proportions
+    '@media (max-width: 1279px)': {
+      gridTemplateColumns: '1.2fr 1fr', // 55% / 45% on large tablet
       gap: '1.5rem',
       padding: '12vh 6vw',
     },
 
+    // Small tablet (768-1023px) - stack vertically for better readability
+    '@media (max-width: 1023px)': {
+      gridTemplateColumns: '1fr',
+      gridTemplateRows: 'auto auto',
+      gap: '1.5rem',
+      padding: '12vh 6vw 16vh',
+      alignContent: 'center',
+    },
+
+    // Mobile (<768px) - stacked with adjusted padding
     '@media (max-width: 767px)': {
       gridTemplateColumns: '1fr',
       gridTemplateRows: 'auto auto',
@@ -826,12 +852,20 @@
               />
             {:else if film.media.type === 'video'}
               <video
-                src={film.media.src}
                 autoplay
                 loop
                 muted
                 playsinline
-              ></video>
+                preload="auto"
+              >
+                {#if film.media.srcWebm}
+                  <source src={film.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
+                {/if}
+                {#if film.media.srcHevc}
+                  <source src={film.media.srcHevc} type="video/mp4; codecs=hvc1" />
+                {/if}
+                <source src={film.media.src} type="video/mp4" />
+              </video>
             {:else if film.media.type === 'image'}
               <img src={film.media.src} alt={film.title} />
             {/if}
@@ -849,12 +883,20 @@
               ></iframe>
             {:else if film.media.type === 'video'}
               <video
-                src={film.media.src}
                 autoplay
                 loop
                 muted
                 playsinline
-              ></video>
+                preload="auto"
+              >
+                {#if film.media.srcWebm}
+                  <source src={film.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
+                {/if}
+                {#if film.media.srcHevc}
+                  <source src={film.media.srcHevc} type="video/mp4; codecs=hvc1" />
+                {/if}
+                <source src={film.media.src} type="video/mp4" />
+              </video>
             {:else if film.media.type === 'image'}
               {#if film.media.externalLink}
                 <a href={film.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
@@ -896,12 +938,20 @@
           ></iframe>
         {:else if currentFilm.media.type === 'video'}
           <video
-            src={currentFilm.media.src}
             autoplay
             loop
             muted
             playsinline
-          ></video>
+            preload="auto"
+          >
+            {#if currentFilm.media.srcWebm}
+              <source src={currentFilm.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
+            {/if}
+            {#if currentFilm.media.srcHevc}
+              <source src={currentFilm.media.srcHevc} type="video/mp4; codecs=hvc1" />
+            {/if}
+            <source src={currentFilm.media.src} type="video/mp4" />
+          </video>
         {:else if currentFilm.media.type === 'image'}
           {#if currentFilm.media.externalLink}
             <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
