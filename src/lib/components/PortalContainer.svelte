@@ -28,9 +28,21 @@
 <script lang="ts" module>
   import type { PortalTransitionConfig, PortalTextAnimationConfig } from '../animation/primitives/portal'
 
-  export interface PortalContainerProps {
-    /** Total scroll duration in seconds */
+  // Context key for scene configuration (exported for child components)
+  export const PORTAL_CONTEXT_KEY = 'portal-scene-config'
+
+  export interface PortalSceneConfig {
+    durations: number[]
+    startTimes: number[]
+    scrollSpeed: number
     totalDuration: number
+  }
+
+  export interface PortalContainerProps {
+    /** Total scroll duration in seconds (use this OR sceneDurations) */
+    totalDuration?: number
+    /** Per-scene durations in seconds (use this OR totalDuration) */
+    sceneDurations?: number[]
     /** Scroll speed in px/s (default: 65) */
     scrollSpeed?: number
     /** Duration of each portal transition in seconds (default: 1.6) */
@@ -51,12 +63,13 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, setContext } from 'svelte'
   import { gsap, ScrollTrigger } from '../core/gsap'
   import { createPortalTransition, setupOutgoingScene, setupIncomingScene } from '../animation/primitives/portal'
 
   let {
     totalDuration,
+    sceneDurations,
     scrollSpeed = 65,
     transitionDuration = 1.6,
     incomingScale = 2.0,
@@ -76,8 +89,31 @@
   let viewportEl: HTMLElement | null = $state(null)
   let ctx: gsap.Context | null = $state(null)
 
+  // Calculate total duration from sceneDurations if provided
+  const computedTotalDuration = $derived(
+    sceneDurations ? sceneDurations.reduce((a, b) => a + b, 0) : (totalDuration ?? 100)
+  )
+
   // Calculate scroll distance
-  const scrollDistance = $derived(totalDuration * scrollSpeed)
+  const scrollDistance = $derived(computedTotalDuration * scrollSpeed)
+
+  // Pre-calculate scene start times from sceneDurations
+  const sceneStartTimes = $derived(() => {
+    if (!sceneDurations) return []
+    const times: number[] = [0]
+    for (let i = 1; i < sceneDurations.length; i++) {
+      times.push(times[i - 1] + sceneDurations[i - 1])
+    }
+    return times
+  })
+
+  // Set context for child sections to read
+  setContext(PORTAL_CONTEXT_KEY, {
+    get durations() { return sceneDurations ?? [] },
+    get startTimes() { return sceneStartTimes() },
+    get scrollSpeed() { return scrollSpeed },
+    get totalDuration() { return computedTotalDuration },
+  } as PortalSceneConfig)
 
   // ============================================================================
   // Animation Setup
@@ -92,24 +128,38 @@
       const sceneElements = viewportEl!.querySelectorAll('[data-scene]')
       const sceneCount = sceneElements.length
 
-      if (debug) {
-        console.log('[PortalContainer] Setup', {
-          sceneCount,
-          totalDuration: `${totalDuration}s`,
-          scrollDistance: `${scrollDistance}px`,
-          transitionDuration: `${transitionDuration}s`,
-          incomingScale,
-          outgoingScale,
-        })
+      // Calculate per-scene durations
+      let durations: number[]
+      if (sceneDurations && sceneDurations.length === sceneCount) {
+        durations = sceneDurations
+      } else if (sceneDurations && sceneDurations.length !== sceneCount) {
+        console.warn(`[PortalContainer] sceneDurations length (${sceneDurations.length}) doesn't match scene count (${sceneCount}), using equal distribution`)
+        durations = Array(sceneCount).fill(computedTotalDuration / sceneCount)
+      } else {
+        durations = Array(sceneCount).fill((totalDuration ?? 100) / sceneCount)
       }
+
+      // Calculate cumulative start times for each scene
+      const sceneStartTimes: number[] = [0]
+      for (let i = 1; i < sceneCount; i++) {
+        sceneStartTimes.push(sceneStartTimes[i - 1] + durations[i - 1])
+      }
+
+      // DIAGNOSTIC: Always log key info (flat)
+      console.log(`[PortalContainer] Setup: sceneCount=${sceneCount} durations=[${durations.join(',')}]s startTimes=[${sceneStartTimes.join(',')}]s totalDuration=${computedTotalDuration}s scrollDistance=${scrollDistance}px windowHeight=${window.innerHeight} transitionDuration=${transitionDuration}s`)
+
+      // DIAGNOSTIC: Log each scene element (flat)
+      sceneElements.forEach((el, i) => {
+        const rect = (el as HTMLElement).getBoundingClientRect()
+        const scrollStart = sceneStartTimes[i] * scrollSpeed
+        const scrollEnd = (sceneStartTimes[i] + durations[i]) * scrollSpeed
+        console.log(`[PortalContainer] Scene ${i} (${(el as HTMLElement).dataset.scene}): top=${rect.top.toFixed(0)} left=${rect.left.toFixed(0)} w=${rect.width.toFixed(0)} h=${rect.height.toFixed(0)} duration=${durations[i]}s startTime=${sceneStartTimes[i]}s scrollRange=${scrollStart}px-${scrollEnd}px`)
+      })
 
       if (sceneCount < 2) {
         console.warn('[PortalContainer] Need at least 2 scenes for transitions')
         return
       }
-
-      // Duration per scene
-      const sceneDuration = totalDuration / sceneCount
 
       // Set up initial states
       sceneElements.forEach((el, i) => {
@@ -131,15 +181,14 @@
         const outgoing = sceneElements[i] as HTMLElement
         const incoming = sceneElements[i + 1] as HTMLElement
 
-        // Calculate trigger points
-        const transitionStart = (i + 1) * sceneDuration - transitionDuration / 2
+        // Calculate trigger points using cumulative scene times
+        // Transition is centered on the boundary between scenes
+        const sceneBoundary = sceneStartTimes[i + 1] // When scene i+1 starts
+        const transitionStart = sceneBoundary - transitionDuration / 2
         const scrollStart = transitionStart * scrollSpeed
 
         if (debug) {
-          console.log(`[PortalContainer] Transition ${i} -> ${i + 1}`, {
-            start: `${transitionStart.toFixed(2)}s`,
-            scrollStart: `${scrollStart.toFixed(0)}px`,
-          })
+          console.log(`[PortalContainer] Transition ${i}->${i + 1}: boundary=${sceneBoundary.toFixed(2)}s start=${transitionStart.toFixed(2)}s scrollStart=${scrollStart.toFixed(0)}px scene${i}Duration=${durations[i]}s scene${i+1}Duration=${durations[i + 1]}s`)
         }
 
         // Create the portal transition with all config options
@@ -157,6 +206,11 @@
         )
 
         // Create ScrollTrigger for this transition
+        const scrollEnd = scrollStart + transitionDuration * scrollSpeed
+
+        // Always log key portal timing info
+        console.log(`[Portal ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
+
         ScrollTrigger.create({
           trigger: containerEl,
           start: `top+=${scrollStart} top`,
@@ -164,24 +218,31 @@
           scrub: true,
           markers: markers,
           animation: timeline,
+          onUpdate: (self) => {
+            // Log portal progress every 25%
+            const progress = Math.round(self.progress * 100)
+            if (progress % 25 === 0) {
+              console.log(`[Portal ${i}->${i+1}] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
+            }
+          },
           onEnter: () => {
-            if (debug) console.log(`[Portal] Enter: ${i} -> ${i + 1}`)
+            console.log(`[Portal ${i}->${i+1}] ENTER scroll=${window.scrollY}px`)
             incoming.style.visibility = 'visible'
           },
           onLeave: () => {
-            if (debug) console.log(`[Portal] Leave: ${i} -> ${i + 1}`)
+            console.log(`[Portal ${i}->${i+1}] LEAVE scroll=${window.scrollY}px`)
             outgoing.style.visibility = 'hidden'
             outgoing.style.zIndex = '0'
             incoming.style.zIndex = '20'
           },
           onEnterBack: () => {
-            if (debug) console.log(`[Portal] EnterBack: ${i + 1} -> ${i}`)
+            console.log(`[Portal ${i}->${i+1}] ENTER_BACK scroll=${window.scrollY}px`)
             outgoing.style.visibility = 'visible'
             outgoing.style.zIndex = '20'
             incoming.style.zIndex = '10'
           },
           onLeaveBack: () => {
-            if (debug) console.log(`[Portal] LeaveBack: ${i + 1} -> ${i}`)
+            console.log(`[Portal ${i}->${i+1}] LEAVE_BACK scroll=${window.scrollY}px`)
             incoming.style.visibility = 'hidden'
           },
         })
@@ -191,9 +252,31 @@
 
     // Refresh ScrollTrigger after setup
     ScrollTrigger.refresh()
+
+    // DIAGNOSTIC: Log scroll position periodically (flat)
+    let lastLoggedScroll = -1000
+    const scrollLogger = () => {
+      const currentScroll = window.scrollY
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+      // Log every 500px
+      if (Math.abs(currentScroll - lastLoggedScroll) >= 500) {
+        lastLoggedScroll = currentScroll
+        console.log(`[PortalContainer] Scroll: current=${currentScroll.toFixed(0)}px max=${maxScroll.toFixed(0)}px expected=${scrollDistance}px excess=${(maxScroll - scrollDistance).toFixed(0)}px pct=${((currentScroll / scrollDistance) * 100).toFixed(1)}%`)
+      }
+    }
+    window.addEventListener('scroll', scrollLogger)
+
+    // Initial log
+    scrollLogger()
+
+    // Store for cleanup
+    ;(ctx as any)._scrollLogger = scrollLogger
   })
 
   onDestroy(() => {
+    if (ctx && (ctx as any)._scrollLogger) {
+      window.removeEventListener('scroll', (ctx as any)._scrollLogger)
+    }
     ctx?.revert()
   })
 </script>

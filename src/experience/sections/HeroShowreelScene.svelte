@@ -14,13 +14,17 @@
   From: docs/plans/2025-01-05-ui-aesthetic-design.md
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, getContext } from 'svelte'
   import { css } from '$styled/css'
   import { gsap, ScrollTrigger } from '$lib/core/gsap'
   import { DURATION } from '$lib/animation/easing'
+  import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
   import LogoStrip from '../components/ui/LogoStrip.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+
+  // Get portal context for scene durations
+  const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
 
   interface Props {
     videoSrc?: string
@@ -88,11 +92,38 @@
       if (sceneIndex < 0) return
 
       // Calculate this scene's scroll range
-      const totalHeight = portalContainer.scrollHeight - window.innerHeight
-      const sceneCount = allScenes.length
-      const sceneHeight = totalHeight / sceneCount
-      const sceneStart = sceneIndex * sceneHeight
-      const sceneEnd = (sceneIndex + 1) * sceneHeight
+      let sceneStart: number
+      let sceneEnd: number
+
+      if (portalConfig && portalConfig.durations.length > 0) {
+        // Use context-provided durations
+        const startTimes = portalConfig.startTimes
+        const durations = portalConfig.durations
+        sceneStart = startTimes[sceneIndex] * portalConfig.scrollSpeed
+        sceneEnd = (startTimes[sceneIndex] + durations[sceneIndex]) * portalConfig.scrollSpeed
+
+        console.log('[HeroShowreel] ScrollTrigger setup (from context):', {
+          sceneIndex,
+          duration: `${durations[sceneIndex]}s`,
+          startTime: `${startTimes[sceneIndex]}s`,
+          sceneStart: `${sceneStart}px`,
+          sceneEnd: `${sceneEnd}px`,
+        })
+      } else {
+        // Fallback to equal distribution
+        const totalHeight = portalContainer.scrollHeight - window.innerHeight
+        const sceneCount = allScenes.length
+        const sceneHeight = totalHeight / sceneCount
+        sceneStart = sceneIndex * sceneHeight
+        sceneEnd = (sceneIndex + 1) * sceneHeight
+
+        console.log('[HeroShowreel] ScrollTrigger setup (fallback equal):', {
+          sceneIndex,
+          sceneCount,
+          sceneStart,
+          sceneEnd,
+        })
+      }
 
       // Create ScrollTrigger to track progress within this scene
       ScrollTrigger.create({
@@ -102,7 +133,14 @@
         scrub: true,
         onUpdate: (self) => {
           scrollProgress = self.progress
+          // Log every 10%
+          const progress = Math.round(self.progress * 100)
+          if (progress % 10 === 0) {
+            console.log(`[HeroShowreel] Progress: ${progress}%`)
+          }
         },
+        onEnter: () => console.log('[HeroShowreel] ScrollTrigger ENTER'),
+        onLeave: () => console.log('[HeroShowreel] ScrollTrigger LEAVE'),
       })
     })
   })

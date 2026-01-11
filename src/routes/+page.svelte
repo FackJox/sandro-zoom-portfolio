@@ -37,10 +37,10 @@
 </svelte:head>
 
 <PortalContainer
-  totalDuration={80}
+  sceneDurations={[16, 36, 16, 16, 16]}
   scrollSpeed={65}
   markers={false}
-  debug={false}
+  debug={true}
 >
   <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
   <HeroShowreelScene />

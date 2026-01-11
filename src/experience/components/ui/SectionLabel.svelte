@@ -6,6 +6,11 @@
 
   Design: Alpine Noir - condensed, flanked by thin line
   From: docs/Brand Design System.md - "Section titles in condensed display, flanked by a thin line"
+
+  Props:
+  - text: The label text to display
+  - variant: 'default' | 'accent' (color variant)
+  - textRef: Bindable reference to the text element for external animation
 -->
 <script lang="ts">
   import { css } from '$styled/css'
@@ -13,9 +18,10 @@
   interface Props {
     text: string
     variant?: 'default' | 'accent'
+    textRef?: HTMLSpanElement | null
   }
 
-  let { text, variant = 'default' }: Props = $props()
+  let { text, variant = 'default', textRef = $bindable(null) }: Props = $props()
 
   const containerStyles = css({
     display: 'flex',
@@ -49,5 +55,5 @@
 
 <div class={containerStyles} data-animate="text">
   <span class={lineStyles}></span>
-  <span class={textStyles}>{text}</span>
+  <span bind:this={textRef} class={textStyles} data-section-label-text>{text}</span>
 </div>
