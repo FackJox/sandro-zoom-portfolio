@@ -109,9 +109,7 @@
 
   // Derived state
   const currentFilm = $derived(films[activeIndex])
-  const labelText = $derived(
-    phase === 'overview' ? 'FILM' : 'FILM — HIGH ALTITUDE FEATURES'
-  )
+  const labelText = 'FILM'
   const steps = films.map(f => ({ id: f.id, label: f.title }))
 
   // DIAGNOSTIC: Log phase and activeIndex changes
@@ -338,20 +336,6 @@
         }
       })
 
-      // PHASE 3: Label scramble text transition
-      // Note: Remove 'speed' param so GSAP uses our explicit duration, not calculated from text length
-      if (labelTextElement) {
-        tl.to(labelTextElement, {
-          text: {
-            value: 'FILM — HIGH ALTITUDE FEATURES',
-            delimiter: '',
-          },
-          duration: CINEMATIC,
-          ease: 'none',
-          onStart: () => { phase = 'transition' }
-        }, pos(PHASES.LABEL_SCRAMBLE))
-      }
-
       // PHASE 4: Layout shift - transition from overview grid to focus layout
       // The focus layout is a separate CSS Grid with proper 60/40 split
       // Fade out all thumbnails and fade in the focus layout
@@ -435,19 +419,6 @@
           ease: 'ease-lock-on',
         }, pos(PHASES.OTHERS_RETURN))
       })
-
-      // PHASE 9: Label reset back to "FILM"
-      // Note: Remove 'speed' param so GSAP uses our explicit duration
-      if (labelTextElement) {
-        tl.to(labelTextElement, {
-          text: {
-            value: 'FILM',
-            delimiter: '',
-          },
-          duration: MICRO,
-          ease: 'none',
-        }, pos(PHASES.LABEL_RESET))
-      }
 
       tl.call(() => {
         phase = 'overview'

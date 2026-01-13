@@ -2,7 +2,7 @@
   import { browser } from '$app/environment'
   import { registerGSAP } from '$lib/core/gsap'
   import { PortalContainer } from '$lib/components'
-
+  
   // Import section components
   import {
     HeroShowreelScene,
@@ -15,6 +15,25 @@
   // Register GSAP immediately on client (before any components mount)
   if (browser) {
     registerGSAP()
+  }
+
+  // Loading state management
+  let isLoading = $state(true)
+  let entranceReady = $state(false)
+  const loadStartTime = Date.now()
+
+  function handleVideoReady() {
+    // Ensure minimum 300ms loader display to prevent jarring instant load on cached video
+    const elapsed = Date.now() - loadStartTime
+    const minLoadTime = 300
+    const delay = Math.max(0, minLoadTime - elapsed)
+
+    // Single timeout for minimum display - both states change together
+    // HeroShowreelScene's timeline handles the coordination with loader fade
+    setTimeout(() => {
+      isLoading = false
+      entranceReady = true
+    }, delay)
   }
 
   // About section beat data
@@ -64,7 +83,7 @@
   debug={true}
 >
   <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
-  <HeroShowreelScene />
+  <HeroShowreelScene onVideoReady={handleVideoReady} {entranceReady} {isLoading} />
 
   <!-- Scene 2: Film Overview -->
   <FilmOverviewSection />

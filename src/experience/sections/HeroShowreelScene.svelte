@@ -28,10 +28,16 @@
 
   interface Props {
     videoSrc?: string
+    onVideoReady?: () => void
+    entranceReady?: boolean
+    isLoading?: boolean
   }
 
   let {
-    videoSrc = '/videos/showreel.mp4'
+    videoSrc = '/videos/showreel.mp4',
+    onVideoReady,
+    entranceReady = false,
+    isLoading = true
   }: Props = $props()
 
   // Copy from design spec
@@ -41,7 +47,17 @@
   // State
   let containerEl: HTMLElement | null = $state(null)
   let videoEl: HTMLVideoElement | null = $state(null)
+  let logoEl: HTMLImageElement | null = $state(null)
+  let supportingTextEl: HTMLElement | null = $state(null)
+  let logosEl: HTMLElement | null = $state(null)
   let ctx: gsap.Context | null = $state(null)
+
+  // Video loading state
+  let videoReady = $state(false)
+
+  // Entrance animation state
+  let hasAnimatedEntrance = $state(false)
+  let entranceTimeline: gsap.core.Timeline | null = null
 
   // Reactive scroll progress (0-1 within this scene)
   let scrollProgress = $state(0)
@@ -70,6 +86,105 @@
 
   // Showreel label opacity (fade in during transition)
   const showreelLabelOpacity = $derived(transitionProgress)
+
+  // Video load detection
+  $effect(() => {
+    if (!videoEl) return
+
+    const handleCanPlayThrough = () => {
+      videoReady = true
+      onVideoReady?.()
+    }
+
+    // Check if already ready (cached video)
+    if (videoEl.readyState >= 4) {
+      handleCanPlayThrough()
+      return
+    }
+
+    videoEl.addEventListener('canplaythrough', handleCanPlayThrough)
+
+    // Timeout fallback (5 seconds)
+    const timeout = setTimeout(() => {
+      if (!videoReady) {
+        videoReady = true
+        onVideoReady?.()
+      }
+    }, 5000)
+
+    return () => {
+      videoEl?.removeEventListener('canplaythrough', handleCanPlayThrough)
+      clearTimeout(timeout)
+    }
+  })
+
+  // Initialize hidden states via GSAP on mount
+  // This ensures GSAP has full control from the start
+  $effect(() => {
+    if (!supportingTextEl || !logosEl || !logoEl) return
+
+    // Set initial hidden state - GSAP controls everything
+    gsap.set([supportingTextEl, logosEl], { autoAlpha: 0 })
+    gsap.set(logoEl, { autoAlpha: 0 })
+  })
+
+  // Logo fade-in once layout is stable
+  // Brand Physics: ease-lock-on, brand-standard duration
+  $effect(() => {
+    if (!logoEl) return
+
+    const easeLockOn = 'cubic-bezier(0.19, 1.0, 0.22, 1.0)'
+
+    // Small delay for layout to stabilize, then fade in
+    gsap.to(logoEl, {
+      autoAlpha: 1,
+      duration: 0.315, // brand-standard (280-350ms)
+      ease: easeLockOn,
+      delay: 0.1 // Wait for layout
+    })
+  })
+
+  // Entrance animation effect
+  // Robust pattern: single timeline with built-in delays for loader coordination
+  $effect(() => {
+    if (!entranceReady || hasAnimatedEntrance || !supportingTextEl || !logosEl) return
+
+    // Prevent re-running
+    hasAnimatedEntrance = true
+
+    // Brand Physics: ease-lock-on for entering elements
+    const easeLockOn = 'cubic-bezier(0.19, 1.0, 0.22, 1.0)'
+
+    // Loader fade duration is 550ms
+    // Start entrance at 400ms to overlap with end of loader fade
+    const loaderOverlap = 0.4
+
+    // Single timeline coordinates entire entrance
+    entranceTimeline = gsap.timeline()
+
+    // Logos fade and rise in first (starts during loader fade-out)
+    entranceTimeline.fromTo(logosEl,
+      { autoAlpha: 0, y: 15 },
+      { autoAlpha: 1, y: 0, duration: 0.5, ease: easeLockOn },
+      loaderOverlap
+    )
+
+    // Pause, then supporting text fades and rises in
+    entranceTimeline.fromTo(supportingTextEl,
+      { autoAlpha: 0, y: 20 },
+      { autoAlpha: 1, y: 0, duration: 0.5, ease: easeLockOn },
+      loaderOverlap + 0.8 // 400ms pause after logos finish
+    )
+  })
+
+  // Scroll-based fade-out (after entrance complete)
+  // GSAP controls opacity to avoid inline style conflicts
+  $effect(() => {
+    if (!hasAnimatedEntrance || !supportingTextEl || !logosEl) return
+
+    // Sync opacity with scroll progress
+    gsap.set([supportingTextEl, logosEl], { opacity: contentOpacity })
+  })
 
   onMount(() => {
     if (!containerEl) return
@@ -146,10 +261,22 @@
   })
 
   onDestroy(() => {
+    entranceTimeline?.kill()
     ctx?.revert()
   })
 
   // Styles
+
+  // Loader overlay - fades out when isLoading becomes false
+  const loaderOverlayStyles = css({
+    position: 'absolute',
+    inset: '0',
+    backgroundColor: '#0f171a', // Black Stallion
+    zIndex: '100',
+    transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
+    pointerEvents: 'none',
+  })
+
   const containerStyles = css({
     position: 'absolute',
     inset: '0',
@@ -178,22 +305,37 @@
     transition: 'opacity 0.1s linear',
   })
 
-  const contentStyles = css({
+  // Main content wrapper - positions both logo and supporting text
+  // z-index 200 to be above loader overlay (100) so logo shows through
+  const contentWrapperStyles = css({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
     maxWidth: '800px',
     padding: '0 2rem',
-    zIndex: '10',
-    transition: 'opacity 0.1s linear',
+    zIndex: '200',
+    position: 'relative',
   })
 
+  // Logo - starts hidden, fades in once layout stable
   const logoStyles = css({
     width: '100%',
     maxWidth: '100%',
     height: 'auto',
     margin: '0',
+    opacity: '0', // Prevent flash before GSAP takes over
+    visibility: 'hidden',
+  })
+
+  // Supporting text container - starts hidden via CSS, GSAP controls entrance
+  const supportingTextStyles = css({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+    opacity: '0', // Prevent flash before GSAP takes over
+    visibility: 'hidden',
   })
 
   const taglineStyles = css({
@@ -226,6 +368,7 @@
     },
   })
 
+  // Logos container - starts hidden via CSS, GSAP controls entrance
   const logosContainerStyles = css({
     position: 'absolute',
     bottom: '12vh',
@@ -236,7 +379,8 @@
     alignItems: 'center',
     gap: '0.5rem',
     zIndex: '10',
-    transition: 'opacity 0.1s linear',
+    opacity: '0', // Prevent flash before GSAP takes over
+    visibility: 'hidden',
 
     '@media (max-width: 767px)': {
       bottom: '15vh',
@@ -266,6 +410,14 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="hero-showreel">
+  <!-- Loader overlay - same stacking context guarantees pixel-perfect logo alignment -->
+  <div
+    class={loaderOverlayStyles}
+    style:opacity={isLoading ? 1 : 0}
+    aria-hidden={!isLoading}
+    data-loader
+  ></div>
+
   <!-- Video Background (filter animates based on scroll) -->
   <video
     bind:this={videoEl}
@@ -285,22 +437,29 @@
     style:opacity={overlayOpacity}
   ></div>
 
-  <!-- Hero Content (fades and slides out during transition) -->
+  <!-- Hero Content -->
   <div
-    class={contentStyles}
+    class={contentWrapperStyles}
     style:opacity={contentOpacity}
     style:transform={contentTransform}
   >
-    <img src="/sandro-logo.png" alt="Sandro" class={logoStyles} data-animate="text" />
-    <p class={taglineStyles} data-animate="text">{tagline}</p>
-    <p class={descriptionStyles} data-animate="text">{description}</p>
+    <!-- Logo - fades in once layout stable, shows through loader overlay -->
+    <img bind:this={logoEl} src="/sandro-logo.png" alt="Sandro" class={logoStyles} />
+
+    <!-- Supporting text - GSAP controls entrance and scroll fade-out -->
+    <div
+      bind:this={supportingTextEl}
+      class={supportingTextStyles}
+    >
+      <p class={taglineStyles}>{tagline}</p>
+      <p class={descriptionStyles}>{description}</p>
+    </div>
   </div>
 
-  <!-- Hero Logos (fades and slides out during transition) -->
+  <!-- Hero Logos - GSAP controls entrance and scroll fade-out -->
   <div
+    bind:this={logosEl}
     class={logosContainerStyles}
-    style:opacity={contentOpacity}
-    style:transform={contentTransform}
   >
     <LogoStrip />
   </div>
