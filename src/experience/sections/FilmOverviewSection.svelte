@@ -744,11 +744,18 @@
     bottom: '0',
     left: '0',
     right: '0',
-    padding: '1.5rem 1rem 1rem',
-    background: 'linear-gradient(to top, rgba(15, 23, 26, 0.95) 0%, rgba(15, 23, 26, 0) 100%)',
+    padding: '1.25rem 1rem 0.875rem',
+    // Enhanced gradient: stronger vignette for reliable text legibility
+    background: `linear-gradient(
+      to top,
+      rgba(15, 23, 26, 0.98) 0%,
+      rgba(15, 23, 26, 0.85) 40%,
+      rgba(15, 23, 26, 0.4) 70%,
+      rgba(15, 23, 26, 0) 100%
+    )`,
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.25rem',
+    gap: '0.125rem',
     zIndex: '10', // Above thumbnail and video layers
   })
 
@@ -757,7 +764,8 @@
     fontWeight: '700',
     fontSize: '1rem',
     letterSpacing: '0.05em',
-    color: 'brand.text',
+    // Egg Toast yellow - the "danger" accent that slices through imagery
+    color: '#f6c605',
     textTransform: 'uppercase',
 
     '@media (max-width: 767px)': {
@@ -767,10 +775,11 @@
 
   const filmClientStyles = css({
     fontFamily: 'IBM Plex Sans, sans-serif',
-    fontWeight: '400',
-    fontSize: '0.75rem',
-    letterSpacing: '0.1em',
-    color: 'brand.textMuted',
+    fontWeight: '500',
+    fontSize: '0.6875rem',
+    letterSpacing: '0.12em',
+    // Tradewind - lighter support tone for visibility while staying subordinate
+    color: '#b7c6cc',
     textTransform: 'uppercase',
   })
 

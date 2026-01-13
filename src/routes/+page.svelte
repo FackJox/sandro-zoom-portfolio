@@ -7,8 +7,7 @@
   import {
     HeroShowreelScene,
     FilmOverviewSection,
-    // StoriesSection removed - merged into Film
-    AboutSection,
+    AboutScene,
     ServicesSection,
     ContactSection
   } from '$experience/sections'
@@ -17,6 +16,28 @@
   if (browser) {
     registerGSAP()
   }
+
+  // About section beat data
+  const aboutBeats = [
+    {
+      id: 'frontline',
+      subtitle: 'FRONT-LINE PERSPECTIVE',
+      text: "Over the past decade I've documented some of the biggest stories from the world of high altitude mountaineering. I stood on the highest peak in Afghanistan, Mt Noshaq as the first Afghan woman summited and the highest peak in Pakistan, K2 as the first Pakistani woman summited. I filmed Nirmal Purja as he set a blazing speed record on the 14 8,000ers and filmed Kristin Harila as she smashed it.",
+      imageSrc: '/pictures/heli rescue (1 of 2).jpg'
+    },
+    {
+      id: 'origin',
+      subtitle: 'ORIGIN STORY',
+      text: "A winding path brought me to the mountains. After dropping out of uni I spent 3 years in Birmingham filming raves, music videos and weddings. Wanting to see more of the world I joined the British army reserve and soon the commando training combined with my passion for story telling provided opportunities to do just that. I filmed army expeds to Dhaulagiri in 2016 and Everest in 2017, began building a basecamp network and haven't really stopped carrying cameras up mountains since.",
+      imageSrc: '/pictures/IMG_1101.JPG'
+    },
+    {
+      id: 'values',
+      subtitle: 'VALUES + ONGOING WORK',
+      text: "With feeling and fortitude I have the experience to bring human stories from the world's most inhumane corners. I believe deeply in representation and hope the projects I've worked on show people what's possible when you look up and believe. Stories from the mountains and the people in between are slowly being collected on my Youtube channel.",
+      imageSrc: '/pictures/push (19 of 22).jpg'
+    }
+  ]
 </script>
 
 <svelte:head>
@@ -37,7 +58,7 @@
 </svelte:head>
 
 <PortalContainer
-  sceneDurations={[16, 36, 16, 16, 16]}
+  sceneDurations={[16, 36, 8, 8, 8, 16, 16]}
   scrollSpeed={65}
   markers={false}
   debug={true}
@@ -48,12 +69,21 @@
   <!-- Scene 2: Film Overview -->
   <FilmOverviewSection />
 
-  <!-- Scene 3: About -->
-  <AboutSection />
+  <!-- Scenes 3-5: About (3 full-screen beats) -->
+  {#each aboutBeats as beat, i}
+    <AboutScene
+      id={beat.id}
+      beatIndex={i}
+      totalBeats={aboutBeats.length}
+      subtitle={beat.subtitle}
+      text={beat.text}
+      imageSrc={beat.imageSrc}
+    />
+  {/each}
 
-  <!-- Scene 4: Services -->
+  <!-- Scene 6: Services -->
   <ServicesSection />
 
-  <!-- Scene 5: Contact -->
+  <!-- Scene 7: Contact -->
   <ContactSection />
 </PortalContainer>
