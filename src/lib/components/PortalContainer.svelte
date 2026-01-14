@@ -66,19 +66,6 @@
   import { onMount, onDestroy, setContext } from 'svelte'
   import { gsap, ScrollTrigger } from '../core/gsap'
   import { createPortalTransition, setupOutgoingScene, setupIncomingScene } from '../animation/primitives/portal'
-  import {
-    getTransition,
-    executeCardFlipTransition,
-    initSceneState,
-    resetSceneState,
-    startTransition,
-    completeTransition,
-    cancelTransition,
-    canTransitionForward,
-    canTransitionBackward,
-    setActiveScene,
-  } from '../transitions'
-  import type { CardFlipTransitionConfig } from '../transitions'
 
   let {
     totalDuration,
@@ -174,9 +161,6 @@
         return
       }
 
-      // Initialize global scene state manager
-      initSceneState(sceneCount)
-
       // Set up initial states
       sceneElements.forEach((el, i) => {
         const sceneEl = el as HTMLElement
@@ -207,156 +191,61 @@
           console.log(`[PortalContainer] Transition ${i}->${i + 1}: boundary=${sceneBoundary.toFixed(2)}s start=${transitionStart.toFixed(2)}s scrollStart=${scrollStart.toFixed(0)}px scene${i}Duration=${durations[i]}s scene${i+1}Duration=${durations[i + 1]}s`)
         }
 
-        // Get transition type from router
-        const transition = getTransition(i, i + 1)
-        console.log(`[PortalContainer] Transition ${i}->${i+1} type: ${transition.type}`)
+        // Create the portal transition with all config options
+        const { timeline } = createPortalTransition(
+          outgoing,
+          incoming,
+          {
+            duration: transitionDuration,
+            anchor,
+            incomingScale,
+            outgoingScale,
+            textAnimation,
+            debug,
+          }
+        )
 
-        if (transition.type === 'cardFlip') {
-          // =====================================================================
-          // Card Flip Transition (scroll-triggered with scroll lock)
-          // Uses global scene state manager for guards
-          // =====================================================================
-          const cardFlipConfig = transition.config as CardFlipTransitionConfig
+        // Create ScrollTrigger for this transition
+        const scrollEnd = scrollStart + transitionDuration * scrollSpeed
 
-          // Calculate scroll boundaries for this transition
-          const scrollEnd = scrollStart + transitionDuration * scrollSpeed
+        // Always log key portal timing info
+        console.log(`[Portal ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
 
-          // Target positions: where scroll should land after transition completes
-          // Add small buffer past the trigger end to ensure clean state
-          const targetScrollForward = scrollEnd + 10
-          const targetScrollBack = Math.max(0, scrollStart - 10)
-
-          console.log(`[CardFlip ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
-          console.log(`[CardFlip ${i}->${i+1}] Target positions: forward=${targetScrollForward.toFixed(0)}px back=${targetScrollBack.toFixed(0)}px`)
-
-          ScrollTrigger.create({
-            trigger: containerEl,
-            start: `top+=${scrollStart} top`,
-            end: `+=${transitionDuration * scrollSpeed}`,
-            markers: markers,
-            onEnter: async () => {
-              // Use global scene state manager for guard
-              if (!startTransition(i, i + 1)) return
-              console.log(`[CardFlip ${i}->${i+1}] ENTER - triggering flip forward`)
-
-              try {
-                // Execute card flip with scroll lock and target position
-                await executeCardFlipTransition(
-                  outgoing,
-                  incoming,
-                  cardFlipConfig,
-                  targetScrollForward
-                )
-
-                // Update z-index after transition
-                outgoing.style.zIndex = '0'
-                incoming.style.zIndex = '20'
-
-                // Mark transition complete
-                completeTransition(i + 1)
-              } catch (error) {
-                console.error(`[CardFlip ${i}->${i+1}] Error:`, error)
-                cancelTransition()
-              }
-            },
-            onLeaveBack: async () => {
-              // Use global scene state manager for guard
-              if (!startTransition(i + 1, i)) return
-              console.log(`[CardFlip ${i}->${i+1}] LEAVE_BACK - triggering flip backward`)
-
-              try {
-                // Reverse: flip back to show outgoing with scroll lock
-                await executeCardFlipTransition(
-                  incoming,
-                  outgoing,
-                  cardFlipConfig,
-                  targetScrollBack
-                )
-
-                // Restore z-index and visibility
-                outgoing.style.zIndex = '20'
-                incoming.style.zIndex = '10'
-                outgoing.style.visibility = 'visible'
-                incoming.style.visibility = 'hidden'
-
-                // Mark transition complete
-                completeTransition(i)
-              } catch (error) {
-                console.error(`[CardFlip ${i}->${i+1}] Error:`, error)
-                cancelTransition()
-              }
-            },
-          })
-        } else {
-          // =====================================================================
-          // Portal Transition (scrubbed)
-          // Uses global scene state manager for guards
-          // =====================================================================
-          const { timeline } = createPortalTransition(
-            outgoing,
-            incoming,
-            {
-              duration: transitionDuration,
-              anchor,
-              incomingScale,
-              outgoingScale,
-              textAnimation,
-              debug,
+        ScrollTrigger.create({
+          trigger: containerEl,
+          start: `top+=${scrollStart} top`,
+          end: `+=${transitionDuration * scrollSpeed}`,
+          scrub: true,
+          markers: markers,
+          animation: timeline,
+          onUpdate: (self) => {
+            // Log portal progress every 25%
+            const progress = Math.round(self.progress * 100)
+            if (progress % 25 === 0) {
+              console.log(`[Portal ${i}->${i+1}] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
             }
-          )
-
-          const scrollEnd = scrollStart + transitionDuration * scrollSpeed
-          console.log(`[Portal ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
-
-          ScrollTrigger.create({
-            trigger: containerEl,
-            start: `top+=${scrollStart} top`,
-            end: `+=${transitionDuration * scrollSpeed}`,
-            scrub: true,
-            markers: markers,
-            animation: timeline,
-            onUpdate: (self) => {
-              // Log portal progress every 25%
-              const progress = Math.round(self.progress * 100)
-              if (progress % 25 === 0) {
-                console.log(`[Portal ${i}->${i+1}] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
-              }
-            },
-            onEnter: () => {
-              // Guard: only execute if this is the expected forward transition
-              // Use check-only function (scrubbed animations don't need to lock)
-              if (!canTransitionForward(i, i + 1)) return
-              console.log(`[Portal ${i}->${i+1}] ENTER scroll=${window.scrollY}px`)
-              incoming.style.visibility = 'visible'
-            },
-            onLeave: () => {
-              // Guard: verify this transition should complete
-              if (!canTransitionForward(i, i + 1)) return
-              console.log(`[Portal ${i}->${i+1}] LEAVE scroll=${window.scrollY}px`)
-              outgoing.style.visibility = 'hidden'
-              outgoing.style.zIndex = '0'
-              incoming.style.zIndex = '20'
-              // Update active scene (no lock needed for scrubbed)
-              setActiveScene(i + 1)
-            },
-            onEnterBack: () => {
-              // Guard: only execute if this is the expected backward transition
-              if (!canTransitionBackward(i + 1, i)) return
-              console.log(`[Portal ${i}->${i+1}] ENTER_BACK scroll=${window.scrollY}px`)
-              outgoing.style.visibility = 'visible'
-              outgoing.style.zIndex = '20'
-              incoming.style.zIndex = '10'
-            },
-            onLeaveBack: () => {
-              // Guard: verify this transition should complete
-              if (!canTransitionBackward(i + 1, i)) return
-              console.log(`[Portal ${i}->${i+1}] LEAVE_BACK scroll=${window.scrollY}px`)
-              incoming.style.visibility = 'hidden'
-              // Update active scene (no lock needed for scrubbed)
-              setActiveScene(i)
-            },
-          })
-        }
+          },
+          onEnter: () => {
+            console.log(`[Portal ${i}->${i+1}] ENTER scroll=${window.scrollY}px`)
+            incoming.style.visibility = 'visible'
+          },
+          onLeave: () => {
+            console.log(`[Portal ${i}->${i+1}] LEAVE scroll=${window.scrollY}px`)
+            outgoing.style.visibility = 'hidden'
+            outgoing.style.zIndex = '0'
+            incoming.style.zIndex = '20'
+          },
+          onEnterBack: () => {
+            console.log(`[Portal ${i}->${i+1}] ENTER_BACK scroll=${window.scrollY}px`)
+            outgoing.style.visibility = 'visible'
+            outgoing.style.zIndex = '20'
+            incoming.style.zIndex = '10'
+          },
+          onLeaveBack: () => {
+            console.log(`[Portal ${i}->${i+1}] LEAVE_BACK scroll=${window.scrollY}px`)
+            incoming.style.visibility = 'hidden'
+          },
+        })
       }
 
     }, containerEl)
@@ -389,7 +278,6 @@
       window.removeEventListener('scroll', (ctx as any)._scrollLogger)
     }
     ctx?.revert()
-    resetSceneState()
   })
 </script>
 

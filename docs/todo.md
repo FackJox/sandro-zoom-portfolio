@@ -1,12 +1,10 @@
 
 
-- dark background on portal zoom, currently turns transparent which loses its effect
-- egg roll on portal zoom outline?
+- egg roll on portal zoom outline? could be light like the grid transition.
 
 
 - film overview stack clickable
-- remove section label change
-- film overview stack thumbnails - gif snippets of the film -- ffmpeg
+- film overview stack thumbnails 
 - overview stack fit vertically in mobile / single column or scrollable? 
 
 - funny logic when going backwards - some are shown twice
@@ -14,16 +12,19 @@
 
 - positions jump about, also instantly jumps between thumbnail position and videoplayer position in focus
 
+- gif snippets of the film -- ffmpeg for previews. 
 - remove beats in filmoverview
-- doesn't portal zoom out, About section's image just covers it
 
 - About - ken burns effect on the images
+- About portal zoom needs to work backwards.
 
 - grid services transitions
 - 3d camera services transitions
 
 - About and Overview timings
-- portal zoom element slide in locations
+- scroll nudge too low down
+- title label too low down
+- portal zoom element slide in locations all around the viewport and not just from the right
 
 - performance, lazy load etc.
 
