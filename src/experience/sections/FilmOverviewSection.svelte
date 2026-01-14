@@ -112,9 +112,21 @@
   const labelText = 'FILM'
   const steps = films.map(f => ({ id: f.id, label: f.title }))
 
-  // DIAGNOSTIC: Log phase and activeIndex changes
+  // Timeline proportions (component-level for access in onUpdate)
+  const PORTAL_BUFFER = 0.05
+  const ACTIVE_START = PORTAL_BUFFER
+  const ACTIVE_END = 1 - PORTAL_BUFFER
+  const ACTIVE_RANGE = ACTIVE_END - ACTIVE_START // 90%
+  const FILM_RANGE = ACTIVE_RANGE / films.length // 22.5% each
+
+  // Phase thresholds within each film's cycle (relative to FILM_RANGE)
+  const PHASE_LAYOUT_SHIFT = 0.222
+  const PHASE_LAYOUT_RESET = 0.667
+
+  // DIAGNOSTIC: Log phase and activeIndex changes with video sources
   $effect(() => {
-    console.log(`[FilmOverview] State: phase=${phase} activeIndex=${activeIndex} currentFilm=${currentFilm?.id}`)
+    const videoSrc = currentFilm?.media?.src || 'none'
+    console.log(`[FilmOverview] STATE_CHANGE: phase=${phase} activeIndex=${activeIndex} currentFilm=${currentFilm?.id} videoSrc=${videoSrc}`)
   })
 
   // Mobile detection
@@ -163,32 +175,10 @@
     const overviewGrid = container.querySelector('[data-overview-grid]') as HTMLElement
     const labelTextElement = container.querySelector('[data-section-label-text]') as HTMLElement
 
-    // DIAGNOSTIC: Log all queried elements (flat)
-    console.log(`[FilmOverview] buildFilmTimeline - filmFrames=${filmFrames.length} ids=[${Array.from(filmFrames).map(f => f.dataset.film).join(',')}] focusLayout=${!!focusLayout} contentSlabContainer=${!!contentSlabContainer} contentSlab=${!!contentSlab} overviewGrid=${!!overviewGrid} labelTextElement=${!!labelTextElement} mobile=${mobile}`)
-
-    // DIAGNOSTIC: Log each film frame's computed position (flat)
-    filmFrames.forEach((frame, i) => {
-      const rect = frame.getBoundingClientRect()
-      const computed = window.getComputedStyle(frame)
-      console.log(`[FilmOverview] Frame ${i} (${frame.dataset.film}): top=${rect.top.toFixed(0)} left=${rect.left.toFixed(0)} w=${rect.width.toFixed(0)} h=${rect.height.toFixed(0)} visibility=${computed.visibility} opacity=${computed.opacity} display=${computed.display}`)
-    })
-
-    // DIAGNOSTIC: Log grid computed styles (flat)
-    if (overviewGrid) {
-      const gridComputed = window.getComputedStyle(overviewGrid)
-      const gridRect = overviewGrid.getBoundingClientRect()
-      console.log(`[FilmOverview] Grid: top=${gridRect.top.toFixed(0)} left=${gridRect.left.toFixed(0)} w=${gridRect.width.toFixed(0)} h=${gridRect.height.toFixed(0)} cols=${gridComputed.gridTemplateColumns} gap=${gridComputed.gap} display=${gridComputed.display}`)
-    }
-
-    // DIAGNOSTIC: Log media elements and layers inside each film frame (flat)
-    filmFrames.forEach((frame, i) => {
-      const borderedViewport = frame.querySelector('[data-bordered-viewport]') as HTMLElement
-      const thumbnail = frame.querySelector('[data-thumbnail]') as HTMLElement
-      const videoPlayer = frame.querySelector('[data-video-player]') as HTMLElement
-      const overlay = frame.querySelector('[data-film-overlay]') as HTMLElement
-      const iframe = videoPlayer?.querySelector('iframe')
-      const vpRect = borderedViewport?.getBoundingClientRect()
-      console.log(`[FilmOverview] Layers ${i} (${frame.dataset.film}): viewport=${!!borderedViewport} vpSize=${vpRect ? `${vpRect.width.toFixed(0)}x${vpRect.height.toFixed(0)}` : 'null'} thumbnail=${!!thumbnail} videoPlayer=${!!videoPlayer} overlay=${!!overlay} iframe=${!!iframe}`)
+    // Log film data for video source verification
+    console.log(`[FilmOverview] buildFilmTimeline - filmCount=${filmFrames.length} mobile=${mobile}`)
+    films.forEach((film, i) => {
+      console.log(`[FilmOverview] Film data ${i}: id=${film.id} video=${film.media.src}`)
     })
 
     // Timeline proportions (0-1)
@@ -207,16 +197,13 @@
     const CINEMATIC = DURATION.cinematic / SCENE_DURATION
 
     // Initialize all elements - start with opacity 0 for fadeIn
-    console.log('[FilmOverview] Initializing element states (autoAlpha: 0, scale: 0.95, width: 100%)')
     filmFrames.forEach((frame, i) => {
       gsap.set(frame, { autoAlpha: 0, scale: 0.95, width: '100%' })
-      console.log(`[FilmOverview] Set film frame ${i} to autoAlpha: 0, scale: 0.95, width: 100%`)
     })
 
     // Initialize focus layout (hidden initially, shown during focus state)
     if (focusLayout) {
       gsap.set(focusLayout, { autoAlpha: 0, pointerEvents: 'none' })
-      console.log('[FilmOverview] Set focusLayout to autoAlpha: 0')
     }
 
     // Initialize content slab within focus layout (offset for enter animation)
@@ -226,23 +213,33 @@
         x: mobile ? 0 : 40,
         y: mobile ? 30 : 0
       })
-      console.log('[FilmOverview] Set contentSlab to autoAlpha: 0')
     }
-
-    // DIAGNOSTIC: Check container visibility state
-    const containerComputed = window.getComputedStyle(container)
-    console.log(`[FilmOverview] Container at init: visibility=${containerComputed.visibility} opacity=${containerComputed.opacity} display=${containerComputed.display} zIndex=${containerComputed.zIndex}`)
 
     // INITIAL FADE IN - Should complete right as portal transition finishes
     // Portal transition occupies first 5% of scroll, fadeIn should sync with it
     // Start fadeIn partway through portal so films are visible when portal completes
     const FADE_IN_START = PORTAL_BUFFER - CINEMATIC // Start early so it completes at 5%
 
-    console.log(`[FilmOverview] Timeline config: PORTAL_BUFFER=${PORTAL_BUFFER} ACTIVE_START=${ACTIVE_START} ACTIVE_END=${ACTIVE_END} ACTIVE_RANGE=${ACTIVE_RANGE.toFixed(3)} FILM_RANGE=${FILM_RANGE.toFixed(3)} SCENE_DURATION=${SCENE_DURATION}s FADE_IN_START=${FADE_IN_START.toFixed(4)}`)
+    // Film cycle phases (relative to film's range)
+    // Based on spec: 9s cycle with specific timings
+    // See: docs/plans/2025-01-07-film-overview-section-design.md
+    const PHASES = {
+      HOLD_START: 0.03,        // Brief hold before animations start
+      BORDER_FADE: 0.089,      // 0.8s/9s - Border accent change
+      OTHERS_EXIT: 0.133,      // 1.2s/9s - Others start fading
+      LABEL_SCRAMBLE: 0.200,   // 1.8s/9s - Label text scramble
+      LAYOUT_SHIFT: 0.222,     // 2.0s/9s - Layout transition begins
+      CROSSFADE_IN: 0.260,     // 2.3s/9s - Crossfade thumbnail → video player
+      CONTENT_ENTER: 0.289,    // 2.6s/9s - Content slab enters
+      // HOLD for reading: 2.6s - 5.6s = 3s reading time
+      CONTENT_EXIT: 0.622,     // 5.6s/9s - Content starts leaving
+      CROSSFADE_OUT: 0.640,    // 5.8s/9s - Crossfade video player → thumbnail
+      LAYOUT_RESET: 0.667,     // 6.0s/9s - Return to overview
+      OTHERS_RETURN: 0.722,    // 6.5s/9s - Others fade back in
+      LABEL_RESET: 0.778,      // 7.0s/9s - Label back to "FILM"
+      ACCENT_SHIFT: 0.800,     // 7.2s/9s - Prepare for next film
+    }
 
-    tl.call(() => {
-      console.log(`[FilmOverview] Timeline START - fadeIn beginning at ${FADE_IN_START.toFixed(4)}`)
-    }, [], Math.max(0.01, FADE_IN_START)) // Ensure not negative
 
     filmFrames.forEach((frame, i) => {
       tl.to(frame, {
@@ -263,38 +260,8 @@
       const currentBorder = currentFrame?.querySelector('[data-bordered-viewport]') as HTMLElement
       const otherBorders = otherFrames.map(f => f.querySelector('[data-bordered-viewport]') as HTMLElement)
 
-      console.log(`[FilmOverview] Film ${filmIndex} (${film.id}): cycle=${(cycleStart * 100).toFixed(1)}%-${(cycleEnd * 100).toFixed(1)}%`)
-
-      // Film cycle phases (relative to film's range)
-      // Based on spec: 9s cycle with specific timings
-      // See: docs/plans/2025-01-07-film-overview-section-design.md
-      const PHASES = {
-        HOLD_START: 0.03,        // Brief hold before animations start
-        BORDER_FADE: 0.089,      // 0.8s/9s - Border accent change
-        OTHERS_EXIT: 0.133,      // 1.2s/9s - Others start fading
-        LABEL_SCRAMBLE: 0.200,   // 1.8s/9s - Label text scramble
-        LAYOUT_SHIFT: 0.222,     // 2.0s/9s - Layout transition begins
-        CROSSFADE_IN: 0.260,     // 2.3s/9s - Crossfade thumbnail → video player
-        CONTENT_ENTER: 0.289,    // 2.6s/9s - Content slab enters
-        // HOLD for reading: 2.6s - 5.6s = 3s reading time
-        CONTENT_EXIT: 0.622,     // 5.6s/9s - Content starts leaving
-        CROSSFADE_OUT: 0.640,    // 5.8s/9s - Crossfade video player → thumbnail
-        LAYOUT_RESET: 0.667,     // 6.0s/9s - Return to overview
-        OTHERS_RETURN: 0.722,    // 6.5s/9s - Others fade back in
-        LABEL_RESET: 0.778,      // 7.0s/9s - Label back to "FILM"
-        ACCENT_SHIFT: 0.800,     // 7.2s/9s - Prepare for next film
-      }
-
-      // Note: In the grid-based layout, we transition between overview grid and focus layout
-      // rather than crossfading thumbnail/video within each frame
-
       // Convert phase to absolute timeline position
       const pos = (p: number) => cycleStart + (p * FILM_RANGE)
-
-      // Log when this film cycle starts
-      tl.call(() => {
-        console.log(`[FilmOverview] Film ${filmIndex} (${film.id}) CYCLE_START pos=${cycleStart.toFixed(3)}`)
-      }, [], cycleStart)
 
       // PHASE 1: Border accent to current film
       if (currentBorder) {
@@ -339,12 +306,7 @@
       // PHASE 4: Layout shift - transition from overview grid to focus layout
       // The focus layout is a separate CSS Grid with proper 60/40 split
       // Fade out all thumbnails and fade in the focus layout
-
-      // Update state first so currentFilm updates in the focus layout
-      tl.call(() => {
-        activeIndex = filmIndex
-        console.log(`[FilmOverview] Film ${filmIndex} activeIndex set, currentFilm updated`)
-      }, [], pos(PHASES.LAYOUT_SHIFT))
+      // NOTE: activeIndex and phase are now derived from scroll progress in onUpdate
 
       // Fade out all film frames (overview thumbnails)
       filmFrames.forEach((frame, i) => {
@@ -364,14 +326,7 @@
           duration: CINEMATIC,
           ease: 'ease-lock-on',
         }, pos(PHASES.LAYOUT_SHIFT) + CINEMATIC * 0.3)
-
-        console.log(`[FilmOverview] Film ${filmIndex} focus layout IN at pos=${pos(PHASES.LAYOUT_SHIFT).toFixed(3)}`)
       }
-
-      // Update phase state
-      tl.call(() => {
-        phase = 'focus'
-      }, [], pos(PHASES.LAYOUT_SHIFT) + CINEMATIC)
 
       // PHASE 5: Content slab enters
       if (contentSlab) {
@@ -406,8 +361,6 @@
           duration: CINEMATIC,
           ease: 'ease-release',
         }, pos(PHASES.LAYOUT_RESET))
-
-        console.log(`[FilmOverview] Film ${filmIndex} focus layout OUT at pos=${pos(PHASES.LAYOUT_RESET).toFixed(3)}`)
       }
 
       // Fade in all film frames (overview thumbnails)
@@ -419,10 +372,6 @@
           ease: 'ease-lock-on',
         }, pos(PHASES.OTHERS_RETURN))
       })
-
-      tl.call(() => {
-        phase = 'overview'
-      }, [], pos(PHASES.LABEL_RESET) + STANDARD)
 
       // PHASE 10: Accent shift to next film OR completion for last film
       if (filmIndex < films.length - 1) {
@@ -447,8 +396,6 @@
         }
       } else {
         // Last film: completion animation - prepare for portal exit
-        // Fade all borders to phantom and scale down slightly
-        console.log(`[FilmOverview] Film ${filmIndex} LAST - completion at pos=${pos(PHASES.ACCENT_SHIFT).toFixed(3)}`)
 
         // Fade current border to phantom
         if (currentBorder) {
@@ -470,17 +417,17 @@
       }
     })
 
-    // DEBUG: Log final timeline structure
-    const children = tl.getChildren()
-    console.log(`[FilmOverview] buildFilmTimeline complete: totalDuration=${tl.duration().toFixed(4)}s childAnimations=${children.length}`)
-    children.slice(0, 10).forEach((child, i) => {
-      const startTime = child.startTime?.() ?? 0
-      const duration = child.duration?.() ?? 0
-      console.log(`[FilmOverview] Animation ${i}: start=${startTime.toFixed(4)}s duration=${duration.toFixed(4)}s end=${(startTime + duration).toFixed(4)}s`)
+    // DEBUG: Log film cycle timeline positions summary
+    console.log(`[FilmOverview] ═══════════════════════════════════════════════════════════════════`)
+    console.log(`[FilmOverview] TIMELINE SUMMARY (totalDuration=${tl.duration().toFixed(4)}s)`)
+    console.log(`[FilmOverview] ───────────────────────────────────────────────────────────────────`)
+    films.forEach((film, i) => {
+      const cycleStart = ACTIVE_START + (i * FILM_RANGE)
+      const cycleEnd = cycleStart + FILM_RANGE
+      const pos = (p: number) => cycleStart + (p * FILM_RANGE)
+      console.log(`[FilmOverview] Film ${i} (${film.id.padEnd(12)}): cycle=${(cycleStart * 100).toFixed(1).padStart(5)}%-${(cycleEnd * 100).toFixed(1).padStart(5)}% | focus_at=${(pos(PHASES.LAYOUT_SHIFT) * 100).toFixed(1)}% | overview_at=${(pos(PHASES.LABEL_RESET) * 100).toFixed(1)}%`)
     })
-    if (children.length > 10) {
-      console.log(`[FilmOverview] ... and ${children.length - 10} more animations`)
-    }
+    console.log(`[FilmOverview] ═══════════════════════════════════════════════════════════════════`)
 
     return tl
   }
@@ -489,17 +436,11 @@
   onMount(() => {
     if (!containerEl) return
 
-    console.log('[FilmOverview] onMount - containerEl:', containerEl)
-
     const portalContainer = document.querySelector('[data-portal-container]') as HTMLElement
     if (!portalContainer) {
       console.warn('[FilmOverview] No portal container found')
       return
     }
-
-    // DIAGNOSTIC: Log portal container dimensions
-    const portalRect = portalContainer.getBoundingClientRect()
-    console.log(`[FilmOverview] Portal container: scrollHeight=${portalContainer.scrollHeight} clientHeight=${portalContainer.clientHeight} offsetHeight=${portalContainer.offsetHeight} w=${portalRect.width.toFixed(0)} h=${portalRect.height.toFixed(0)} minHeight=${window.getComputedStyle(portalContainer).minHeight}`)
 
     const viewport = portalContainer.querySelector('[style*="position: fixed"]')
     if (!viewport) {
@@ -507,19 +448,11 @@
       return
     }
 
-    // DIAGNOSTIC: Log viewport
-    const viewportRect = (viewport as HTMLElement).getBoundingClientRect()
-    console.log(`[FilmOverview] Viewport: w=${viewportRect.width.toFixed(0)} h=${viewportRect.height.toFixed(0)}`)
-
     const allScenes = viewport.querySelectorAll('[data-scene]')
     let sectionIndex = -1
     allScenes.forEach((scene, i) => {
       if (scene === containerEl) sectionIndex = i
     })
-
-    // DIAGNOSTIC: Log all scenes
-    const sceneNames = Array.from(allScenes).map((s, i) => `${i}:${(s as HTMLElement).dataset.scene}${s === containerEl ? '*' : ''}`).join(' ')
-    console.log(`[FilmOverview] All scenes: count=${allScenes.length} thisIndex=${sectionIndex} [${sceneNames}]`)
 
     if (sectionIndex < 0) {
       console.warn('[FilmOverview] Section not found in scenes')
@@ -536,8 +469,6 @@
       const durations = portalConfig.durations
       sectionStart = startTimes[sectionIndex] * portalConfig.scrollSpeed
       sectionEnd = (startTimes[sectionIndex] + durations[sectionIndex]) * portalConfig.scrollSpeed
-
-      console.log(`[FilmOverview] ScrollTrigger (context): sectionIndex=${sectionIndex} duration=${durations[sectionIndex]}s startTime=${startTimes[sectionIndex]}s sectionStart=${sectionStart}px sectionEnd=${sectionEnd}px scrollRange=${sectionEnd - sectionStart}px`)
     } else {
       // Fallback to equal distribution
       const totalHeight = portalContainer.scrollHeight - window.innerHeight
@@ -545,9 +476,9 @@
       const sceneHeight = totalHeight / sceneCount
       sectionStart = sectionIndex * sceneHeight
       sectionEnd = (sectionIndex + 1) * sceneHeight
-
-      console.log(`[FilmOverview] ScrollTrigger (fallback): sectionIndex=${sectionIndex} sceneCount=${sceneCount} totalHeight=${totalHeight}px sceneHeight=${sceneHeight}px sectionStart=${sectionStart}px sectionEnd=${sectionEnd}px`)
     }
+
+    console.log(`[FilmOverview] INIT: scrollRange=${sectionStart.toFixed(0)}px-${sectionEnd.toFixed(0)}px (${(sectionEnd - sectionStart).toFixed(0)}px)`)
 
     const isMobileNow = typeof window !== 'undefined'
       && window.matchMedia('(max-width: 767px)').matches
@@ -555,8 +486,6 @@
     ctx = gsap.context(() => {
       const tl = buildFilmTimeline(containerEl!, isMobileNow)
 
-      // DEBUG: Log timeline details
-      console.log(`[FilmOverview] Timeline built: duration=${tl.duration().toFixed(4)}s labels=${Object.keys(tl.labels || {}).join(',')} children=${tl.getChildren().length}`)
 
       const scrollRange = sectionEnd - sectionStart
       const st = ScrollTrigger.create({
@@ -567,10 +496,38 @@
         invalidateOnRefresh: true,
         animation: tl,
         onUpdate: (self) => {
-          // Log every 10% progress with timeline position
-          const progress = Math.round(self.progress * 100)
-          if (progress % 10 === 0) {
-            console.log(`[FilmOverview] progress=${progress}% scroll=${Math.round(self.scroll())}px tlProgress=${(tl.progress() * 100).toFixed(1)}% tlTime=${tl.time().toFixed(4)}s`)
+          const progress = self.progress
+
+          // Derive activeIndex from scroll position (direction-agnostic)
+          if (progress >= ACTIVE_START && progress < ACTIVE_END) {
+            const newIndex = Math.min(
+              films.length - 1,
+              Math.floor((progress - ACTIVE_START) / FILM_RANGE)
+            )
+            if (newIndex !== activeIndex) {
+              const prevIndex = activeIndex
+              activeIndex = newIndex
+              console.log(`[FilmOverview] ACTIVE_INDEX_DERIVED: ${prevIndex} → ${newIndex} at progress=${(progress * 100).toFixed(1)}%`)
+            }
+          }
+
+          // Derive phase from position within film's cycle
+          const cycleOffset = (progress - ACTIVE_START) % FILM_RANGE
+          const cycleProgress = cycleOffset / FILM_RANGE
+          const newPhase = (cycleProgress >= PHASE_LAYOUT_SHIFT && cycleProgress < PHASE_LAYOUT_RESET)
+            ? 'focus'
+            : 'overview'
+          if (newPhase !== phase) {
+            const prevPhase = phase
+            phase = newPhase
+            console.log(`[FilmOverview] PHASE_DERIVED: ${prevPhase} → ${newPhase} at progress=${(progress * 100).toFixed(1)}% cycleProgress=${(cycleProgress * 100).toFixed(1)}%`)
+          }
+
+          // Log every 5% progress
+          const progressPct = Math.round(progress * 100)
+          const direction = self.direction === 1 ? 'FWD' : 'BWD'
+          if (progressPct % 5 === 0) {
+            console.log(`[FilmOverview] SCROLL: ${direction} progress=${progressPct}% activeIndex=${activeIndex} phase=${phase}`)
           }
         },
         onEnter: () => console.log(`[FilmOverview] ENTER scroll=${window.scrollY}px`),
@@ -578,9 +535,6 @@
         onEnterBack: () => console.log(`[FilmOverview] ENTER_BACK scroll=${window.scrollY}px`),
         onLeaveBack: () => console.log(`[FilmOverview] LEAVE_BACK scroll=${window.scrollY}px`),
       })
-
-      // DEBUG: Log ScrollTrigger details
-      console.log(`[FilmOverview] ScrollTrigger created: sectionStart=${sectionStart} sectionEnd=${sectionEnd} scrollRange=${scrollRange} st.start=${st.start} st.end=${st.end} trigger=${portalContainer?.tagName}`)
     }, containerEl)
   })
 
@@ -904,7 +858,8 @@
 
   <!-- Focus Layout Grid (appears during focus state) -->
   <div class={focusLayoutStyles} data-focus-layout>
-    <!-- Video Container -->
+    <!-- Video Container - keyed by activeIndex to force video element recreation -->
+    {#key activeIndex}
     <div class={focusVideoContainerStyles} data-focus-video>
       <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
         <!-- Render current film's video content -->
@@ -960,6 +915,7 @@
         />
       </div>
     </div>
+    {/key}
   </div>
 
   <!-- Step Indicator -->
