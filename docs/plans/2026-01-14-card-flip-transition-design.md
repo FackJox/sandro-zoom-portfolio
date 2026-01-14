@@ -10,10 +10,16 @@ Replace the portal zoom transition between the final About beat (Scene 4: "Value
 
 **Key Characteristics:**
 - Grid of tiles reconstructs the About scene as an image
-- Tiles flip vertically with center-outward wave stagger
-- 10° over-rotation bounce before settling at 180°
+- **Scan corruption pattern** - row-by-row flip (top→bottom, left→right) with random variation
+- **10% glitch tiles** - flip at unexpected times for controlled imperfection
+- **Mechanical easing** - `ease-lock-on` (gimbal acquisition), no bounce
+- **Digital visual treatment** - scan lines, 1px gaps, subtle borders
 - Scroll-triggered (not scrubbed) - plays through automatically
 - 1.6s total duration
+- **Scroll locked during transition** - prevents jump-forward on completion
+
+**Alpine Noir / Machine Archetype:**
+The effect feels like a digital display refresh or satellite data transmission rather than a smooth organic ripple. Precision landing with controlled imperfection.
 
 ## Architecture
 
@@ -107,17 +113,134 @@ function calculateGrid(
 ```
 
 **Target Tile Sizes:**
-- Desktop: ~100px
-- Mobile: ~80px
+- Desktop: ~150px (larger tiles, fewer = more deliberate, machine-like)
+- Mobile: ~100px
 
 **Example Results:**
 
 | Viewport | Target | Grid | Tile Size | Aspect |
 |----------|--------|------|-----------|--------|
-| 1920×1080 (desktop landscape) | 100px | 19×11 | 101×98px | ~1.03 |
-| 1440×900 (laptop) | 100px | 14×9 | 103×100px | ~1.03 |
-| 428×926 (iPhone portrait) | 80px | 5×12 | 86×77px | ~1.11 |
-| 926×428 (iPhone landscape) | 80px | 12×5 | 77×86px | ~0.90 |
+| 1920×1080 (desktop landscape) | 150px | 13×7 | 148×154px | ~0.96 |
+| 1440×900 (laptop) | 150px | 10×6 | 144×150px | ~0.96 |
+| 428×926 (iPhone portrait) | 100px | 4×9 | 107×103px | ~1.04 |
+| 926×428 (iPhone landscape) | 100px | 9×4 | 103×107px | ~0.96 |
+
+## Scroll Locking (GSAP Observer)
+
+**Problem:** The transition plays at fixed duration (1.6s) but isn't scrub-controlled. If the user continues scrolling during the animation, scroll position advances past the transition zone, causing a "jump" when the animation completes.
+
+**Solution:** Use GSAP Observer to intercept all scroll input during the transition.
+
+```typescript
+// src/lib/transitions/scroll-lock.ts
+
+import { Observer } from 'gsap/Observer'
+
+let scrollObserver: Observer | null = null
+
+export function lockScroll(): void {
+  // Kill any existing observer
+  scrollObserver?.kill()
+
+  scrollObserver = Observer.create({
+    type: 'wheel,touch,scroll',
+    preventDefault: true,
+    allowClicks: true,
+    tolerance: 0,
+    onPress: (self) => self.event?.preventDefault(),
+  })
+}
+
+export function unlockScroll(targetScrollY: number): void {
+  scrollObserver?.kill()
+  scrollObserver = null
+
+  // Set scroll to where the incoming scene begins
+  window.scrollTo({ top: targetScrollY, behavior: 'instant' })
+}
+```
+
+**Why GSAP Observer?**
+- Handles wheel, touch, and programmatic scroll
+- Cross-browser touch device support
+- Doesn't modify body/html styles (which breaks fixed positioning)
+- Clean kill/cleanup via GSAP
+
+**Target Scroll Position:**
+When unlocking, set scroll to the START of Scene 5 (Services):
+
+```typescript
+// Scene 5 starts after scenes 0-4: (16 + 36 + 8 + 8 + 8) * scrollSpeed
+const scene5StartScroll = 76 * 65  // = 4940px
+```
+
+## Scan Corruption Pattern
+
+**Row-by-Row Scan with Variation:**
+
+Tiles flip in a scan pattern (top→bottom, left→right within each row) with random timing variation to simulate data transmission latency.
+
+```typescript
+// src/lib/transitions/card-flip.ts
+
+interface TileDelay {
+  index: number
+  delay: number
+  isGlitch: boolean
+}
+
+function calculateScanDelays(
+  cols: number,
+  rows: number,
+  staggerDuration: number,
+  seed: number = 42  // Reproducible across sessions
+): TileDelay[] {
+  const rng = seededRandom(seed)
+  const tileCount = cols * rows
+  const delays: TileDelay[] = []
+
+  // Base delay per row (stagger spread across all rows)
+  const rowDelay = staggerDuration / rows
+
+  for (let i = 0; i < tileCount; i++) {
+    const row = Math.floor(i / cols)
+    const col = i % cols
+
+    // Base scan timing: row position + column offset within row
+    const colOffset = (col / cols) * rowDelay * 0.3  // 30% variation within row
+    let delay = row * rowDelay + colOffset
+
+    // Add random "latency" variation (-10% to +10% of row delay)
+    const latencyVariation = (rng() - 0.5) * 0.2 * rowDelay
+    delay += latencyVariation
+
+    // 10% chance of glitch tile (flips at unexpected time)
+    const isGlitch = rng() < 0.1
+    if (isGlitch) {
+      // Glitch tiles flip either early or late (±30% of total stagger)
+      const glitchOffset = (rng() - 0.5) * 0.6 * staggerDuration
+      delay = Math.max(0, delay + glitchOffset)
+    }
+
+    delays.push({ index: i, delay, isGlitch })
+  }
+
+  return delays
+}
+
+// Seeded random for reproducible results
+function seededRandom(seed: number): () => number {
+  return () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    return seed / 0x7fffffff
+  }
+}
+```
+
+**Glitch Tiles (10%):**
+- Flip at unexpected times (early or late)
+- Creates controlled imperfection
+- Seeded random ensures same pattern every session
 
 ## Card Flip Execution Flow
 
@@ -131,40 +254,63 @@ Scene 4 (About: Values) scrolling...
   getTransition(4, 5) → 'cardFlip'
          │
          ▼
-  1. html2canvas captures Scene 4
-  2. CardFlipGrid mounts over viewport
-  3. Scene 4 DOM hidden (autoAlpha: 0)
-  4. Scene 5 (Services) positioned underneath
-  5. Flip animation plays (1.6s)
-  6. CardFlipGrid unmounts
-  7. Scene 5 now visible
+  1. LOCK SCROLL (Observer intercepts input)
+  2. html2canvas captures Scene 4
+  3. CardFlipGrid mounts over viewport
+  4. Scene 4 DOM hidden (autoAlpha: 0)
+  5. Scene 5 (Services) positioned underneath
+  6. Flip animation plays (1.6s)
+  7. CardFlipGrid unmounts
+  8. UNLOCK SCROLL → set to Scene 5 start position
+  9. Scene 5 now visible, scroll continues normally
 ```
 
 ```typescript
 // src/lib/transitions/card-flip.ts
 
+import { lockScroll, unlockScroll } from './scroll-lock'
+
+interface ExecuteCardFlipConfig extends CardFlipTransitionConfig {
+  targetScrollY: number  // Where to set scroll after transition
+}
+
 async function executeCardFlipTransition(
   outgoing: HTMLElement,
   incoming: HTMLElement,
-  config: CardFlipTransitionConfig
+  config: ExecuteCardFlipConfig
 ): Promise<void> {
-  // 1. Capture outgoing scene
-  const snapshot = await captureScene(outgoing)
+  // 1. Lock scroll immediately
+  lockScroll()
 
-  // 2. Position incoming underneath (invisible but ready)
-  gsap.set(incoming, { autoAlpha: 1, zIndex: 0 })
+  try {
+    // 2. Capture outgoing scene
+    const snapshot = await captureScene(outgoing)
 
-  // 3. Mount grid overlay (zIndex: 100, above incoming)
-  const grid = mountCardFlipGrid(snapshot, config)
+    // 3. Position incoming underneath (visible but behind grid)
+    gsap.set(incoming, { autoAlpha: 1, zIndex: 0 })
+    incoming.style.visibility = 'visible'
 
-  // 4. Hide outgoing DOM (grid shows the snapshot)
-  gsap.set(outgoing, { autoAlpha: 0 })
+    // 4. Mount grid overlay (zIndex: 100, above incoming)
+    const grid = mountCardFlipGrid(snapshot, config)
 
-  // 5. Play flip animation (returns Promise)
-  await grid.play()
+    // 5. Hide outgoing DOM (grid shows the snapshot)
+    gsap.set(outgoing, { autoAlpha: 0 })
 
-  // 6. Cleanup grid
-  grid.destroy()
+    // 6. Play flip animation (returns Promise)
+    await grid.play()
+
+    // 7. Cleanup grid
+    grid.destroy()
+
+    // 8. Update z-index states (match portal behavior)
+    outgoing.style.visibility = 'hidden'
+    outgoing.style.zIndex = '0'
+    incoming.style.zIndex = '20'
+
+  } finally {
+    // 9. Always unlock scroll, even if error
+    unlockScroll(config.targetScrollY)
+  }
 }
 
 async function captureScene(sceneElement: HTMLElement): Promise<string> {
@@ -182,10 +328,24 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
 
 **File:** `src/lib/components/CardFlipGrid.svelte`
 
+**Visual Treatment (Alpine Noir / Machine):**
+- 1px gaps between tiles (Black Stallion #0f171a visible through gaps)
+- Front face: subtle border (Cover of Night at 20% opacity)
+- Back face: Egg Toast accent (15% opacity) - digital activation state
+- Scan line overlay on entire grid
+
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte'
   import { gsap } from 'gsap'
+  import { calculateScanDelays } from '../transitions/card-flip'
+
+  // Brand colors
+  const COLORS = {
+    blackStallion: '#0f171a',     // Background through gaps
+    coverOfNight: '#0c1012',      // Front border (20% opacity)
+    eggToast: '#f4a261',          // Back accent (15% opacity)
+  }
 
   interface Props {
     snapshot: string
@@ -200,11 +360,13 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
   let tiles: HTMLElement[] = []
 
   let grid = $state({ cols: 0, rows: 0, tileW: 0, tileH: 0 })
+  let tileDelays = $state<TileDelay[]>([])
 
   $effect(() => {
     if (typeof window === 'undefined') return
 
-    const targetSize = window.innerWidth < 768 ? 80 : 100
+    // 150px desktop, 100px mobile
+    const targetSize = window.innerWidth < 768 ? 100 : 150
     const cols = Math.round(window.innerWidth / targetSize)
     const rows = Math.round(window.innerHeight / targetSize)
 
@@ -214,23 +376,17 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
       tileW: window.innerWidth / cols,
       tileH: window.innerHeight / rows
     }
+
+    // Calculate scan pattern delays with glitch tiles
+    tileDelays = calculateScanDelays(cols, rows, config.staggerDuration)
   })
 
   const tileCount = $derived(grid.cols * grid.rows)
-  const centerX = $derived((grid.cols - 1) / 2)
-  const centerY = $derived((grid.rows - 1) / 2)
-  const maxDist = $derived(Math.sqrt(centerX ** 2 + centerY ** 2))
-
-  function getDelay(index: number): number {
-    const col = index % grid.cols
-    const row = Math.floor(index / grid.cols)
-    const dist = Math.sqrt((col - centerX) ** 2 + (row - centerY) ** 2)
-    return (dist / maxDist) * config.staggerDuration
-  }
 
   function getBgPosition(index: number): string {
     const col = index % grid.cols
     const row = Math.floor(index / grid.cols)
+    // Account for 1px gaps in background positioning
     return `-${col * grid.tileW}px -${row * grid.tileH}px`
   }
 
@@ -244,12 +400,13 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
           }
         })
 
-        tiles.forEach((tile, i) => {
-          tl.to(tile, {
+        // Use pre-calculated scan delays
+        tileDelays.forEach(({ index, delay }) => {
+          tl.to(tiles[index], {
             rotateX: 180,
             duration: config.duration - config.staggerDuration,
-            ease: 'flipBounce'
-          }, getDelay(i))
+            ease: 'ease-lock-on'  // Mechanical: fast acquisition, smooth settle
+          }, delay)
         })
       }, container)
     })
@@ -266,15 +423,24 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
   aria-hidden="true"
   style:--cols={grid.cols}
   style:--rows={grid.rows}
+  style:--bg-color={COLORS.blackStallion}
 >
+  <!-- Scan line overlay -->
+  <div class="scan-lines" />
+
   {#each Array(tileCount) as _, i}
+    {@const isGlitch = tileDelays[i]?.isGlitch}
     <div
       class="tile"
+      class:glitch={isGlitch}
       bind:this={tiles[i]}
-      style:--bg-pos={getBgPosition(i)}
-      style:--bg-size={`${window.innerWidth}px ${window.innerHeight}px`}
     >
-      <div class="tile-front" style:background-image="url({snapshot})" />
+      <div
+        class="tile-front"
+        style:background-image="url({snapshot})"
+        style:--bg-pos={getBgPosition(i)}
+        style:--bg-size={`${window.innerWidth}px ${window.innerHeight}px`}
+      />
       <div class="tile-back" />
     </div>
   {/each}
@@ -288,7 +454,24 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
     display: grid;
     grid-template-columns: repeat(var(--cols), 1fr);
     grid-template-rows: repeat(var(--rows), 1fr);
+    gap: 1px;  /* Digital data block separation */
+    background: var(--bg-color);  /* Black Stallion visible through gaps */
     perspective: 1200px;
+  }
+
+  /* Scan line overlay - CRT/digital display effect */
+  .scan-lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
   }
 
   .tile {
@@ -304,14 +487,22 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
   }
 
   .tile-front {
-    background-image: inherit;
     background-size: var(--bg-size);
     background-position: var(--bg-pos);
+    /* Subtle border - Cover of Night at 20% opacity */
+    box-shadow: inset 0 0 0 1px rgba(12, 16, 18, 0.2);
   }
 
   .tile-back {
     transform: rotateX(180deg);
     background: transparent;
+    /* Egg Toast accent - digital activation state */
+    box-shadow: inset 0 0 0 1px rgba(244, 162, 97, 0.15);
+  }
+
+  /* Glitch tiles get subtle visual distinction */
+  .tile.glitch .tile-front {
+    box-shadow: inset 0 0 0 1px rgba(244, 162, 97, 0.1);
   }
 </style>
 ```
@@ -320,30 +511,42 @@ async function captureScene(sceneElement: HTMLElement): Promise<string> {
 
 ```typescript
 interface CardFlipTransitionConfig {
-  duration: number           // 1.6s total
-  staggerDuration: number    // 0.8s - spread of stagger delays
-  overshoot: number          // 10 degrees
-  targetTileSize: number     // 100px desktop, 80px mobile
+  duration: number           // 1.6s per tile flip
+  staggerDuration: number    // 0.8s - spread of scan timing
+  glitchProbability: number  // 0.1 (10% of tiles)
+  seed: number               // Random seed for reproducibility
 }
 
 const defaultConfig: CardFlipTransitionConfig = {
   duration: 1.6,
   staggerDuration: 0.8,
-  overshoot: 10,
-  targetTileSize: 100
+  glitchProbability: 0.1,
+  seed: 42
 }
+
+// Tile sizes determined by viewport, not config
+// Desktop: 150px, Mobile: 100px
 ```
 
-## Custom Easing
+## Mechanical Easing
+
+Uses existing brand easing - no new custom ease needed:
 
 ```typescript
-// In src/lib/core/gsap.ts
+// Already defined in src/lib/core/gsap.ts
 
-// Peaks at ~105% (≈190°), settles to 100% (180°)
-CustomEase.create('flipBounce',
-  'M0,0 C0.17,0.67 0.4,1.07 0.5,1.05 0.65,1.02 0.82,1 1,1'
-)
+// ease-lock-on: "Fast acquisition, smooth settle—like a gimbal finding and locking onto a subject"
+CustomEase.create('ease-lock-on', 'M0,0 C0.19,1 0.22,1 1,1')
+
+// No bounce, no overshoot - precision landing
+// The card snaps to 180° with mechanical accuracy
 ```
+
+**Why ease-lock-on:**
+- Matches Alpine Noir / Machine archetype
+- Fast initial rotation (gimbal acquiring target)
+- Smooth deceleration into final position
+- No hunting, no correction - precision landing
 
 ## Files to Create/Modify
 
@@ -354,13 +557,15 @@ CustomEase.create('flipBounce',
 | `src/lib/components/CardFlipGrid.svelte` | Grid overlay component |
 | `src/lib/transitions/router.ts` | Exclusive transition routing |
 | `src/lib/transitions/card-flip.ts` | Card flip execution logic |
+| `src/lib/transitions/scroll-lock.ts` | GSAP Observer scroll locking |
+| `src/lib/transitions/index.ts` | Barrel exports |
 
 **Modified Files:**
 
 | File | Changes |
 |------|---------|
 | `src/lib/components/PortalContainer.svelte` | Use router instead of hardcoded portal |
-| `src/lib/core/gsap.ts` | Add `flipBounce` custom ease |
+| `src/lib/core/gsap.ts` | Register Observer plugin (ease-lock-on already exists) |
 
 ## Dependencies
 

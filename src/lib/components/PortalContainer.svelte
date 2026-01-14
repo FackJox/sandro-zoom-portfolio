@@ -66,6 +66,8 @@
   import { onMount, onDestroy, setContext } from 'svelte'
   import { gsap, ScrollTrigger } from '../core/gsap'
   import { createPortalTransition, setupOutgoingScene, setupIncomingScene } from '../animation/primitives/portal'
+  import { getTransition, isCardFlipTransition, executeCardFlipTransition } from '../transitions'
+  import type { CardFlipTransitionConfig } from '../transitions'
 
   let {
     totalDuration,
@@ -169,12 +171,25 @@
           setupOutgoingScene(sceneEl, anchor)
           sceneEl.style.zIndex = '20'
         } else {
-          // Other scenes are incoming (hidden behind)
-          setupIncomingScene(sceneEl, anchor, incomingScale)
-          sceneEl.style.visibility = 'hidden'
-          sceneEl.style.zIndex = '10'
+          // Check if the transition TO this scene is card flip
+          const isCardFlip = isCardFlipTransition(i - 1, i)
+          if (isCardFlip) {
+            // Card flip: incoming scene should be at normal scale (not zoomed)
+            // It will be revealed by the flipping tiles
+            gsap.set(sceneEl, { autoAlpha: 0, scale: 1 })
+            sceneEl.style.visibility = 'hidden'
+            sceneEl.style.zIndex = '10'
+          } else {
+            // Portal: incoming scene starts zoomed in
+            setupIncomingScene(sceneEl, anchor, incomingScale)
+            sceneEl.style.visibility = 'hidden'
+            sceneEl.style.zIndex = '10'
+          }
         }
       })
+
+      // Track card flip state to prevent re-triggering
+      const cardFlipTriggered: Record<string, boolean> = {}
 
       // Create transitions between each pair of scenes
       for (let i = 0; i < sceneCount - 1; i++) {
@@ -187,65 +202,122 @@
         const transitionStart = sceneBoundary - transitionDuration / 2
         const scrollStart = transitionStart * scrollSpeed
 
+        // Check if this transition should use card flip
+        const transition = getTransition(i, i + 1)
+        const useCardFlip = transition.type === 'cardFlip'
+
         if (debug) {
-          console.log(`[PortalContainer] Transition ${i}->${i + 1}: boundary=${sceneBoundary.toFixed(2)}s start=${transitionStart.toFixed(2)}s scrollStart=${scrollStart.toFixed(0)}px scene${i}Duration=${durations[i]}s scene${i+1}Duration=${durations[i + 1]}s`)
+          console.log(`[PortalContainer] Transition ${i}->${i + 1}: type=${transition.type} boundary=${sceneBoundary.toFixed(2)}s start=${transitionStart.toFixed(2)}s scrollStart=${scrollStart.toFixed(0)}px`)
         }
 
-        // Create the portal transition with all config options
-        const { timeline } = createPortalTransition(
-          outgoing,
-          incoming,
-          {
-            duration: transitionDuration,
-            anchor,
-            incomingScale,
-            outgoingScale,
-            textAnimation,
-            debug,
-          }
-        )
+        if (useCardFlip) {
+          // ============================================================
+          // CARD FLIP TRANSITION
+          // ============================================================
+          const cardFlipConfig = transition.config as CardFlipTransitionConfig
+          const triggerKey = `${i}->${i + 1}`
 
-        // Create ScrollTrigger for this transition
-        const scrollEnd = scrollStart + transitionDuration * scrollSpeed
+          // Calculate target scroll position (where incoming scene starts)
+          const targetScrollY = sceneStartTimes[i + 1] * scrollSpeed
 
-        // Always log key portal timing info
-        console.log(`[Portal ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
+          console.log(`[CardFlip ${i}->${i+1}] Setting up trigger at ${scrollStart.toFixed(0)}px, targetScrollY=${targetScrollY.toFixed(0)}px`)
 
-        ScrollTrigger.create({
-          trigger: containerEl,
-          start: `top+=${scrollStart} top`,
-          end: `+=${transitionDuration * scrollSpeed}`,
-          scrub: true,
-          markers: markers,
-          animation: timeline,
-          onUpdate: (self) => {
-            // Log portal progress every 25%
-            const progress = Math.round(self.progress * 100)
-            if (progress % 25 === 0) {
-              console.log(`[Portal ${i}->${i+1}] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
+          ScrollTrigger.create({
+            trigger: containerEl,
+            start: `top+=${scrollStart} top`,
+            end: `top+=${scrollStart + 1} top`,  // Minimal range - just a trigger point
+            markers: markers,
+            onEnter: async () => {
+              // Prevent re-triggering
+              if (cardFlipTriggered[triggerKey]) {
+                console.log(`[CardFlip ${i}->${i+1}] Already triggered, skipping`)
+                return
+              }
+              cardFlipTriggered[triggerKey] = true
+
+              console.log(`[CardFlip ${i}->${i+1}] TRIGGERED at scroll=${window.scrollY}px`)
+
+              // Execute the card flip transition
+              await executeCardFlipTransition(outgoing, incoming, {
+                ...cardFlipConfig,
+                targetScrollY,
+              })
+
+              console.log(`[CardFlip ${i}->${i+1}] COMPLETE`)
+            },
+            onLeaveBack: () => {
+              // Reset trigger state when scrolling back past the trigger point
+              // This allows the transition to be triggered again if user scrolls back
+              console.log(`[CardFlip ${i}->${i+1}] LEAVE_BACK - resetting trigger state`)
+              cardFlipTriggered[triggerKey] = false
+
+              // Restore outgoing scene, hide incoming
+              gsap.set(outgoing, { autoAlpha: 1 })
+              outgoing.style.visibility = 'visible'
+              outgoing.style.zIndex = '20'
+              gsap.set(incoming, { autoAlpha: 0 })
+              incoming.style.visibility = 'hidden'
+              incoming.style.zIndex = '10'
+            },
+          })
+        } else {
+          // ============================================================
+          // PORTAL ZOOM TRANSITION
+          // ============================================================
+          const { timeline } = createPortalTransition(
+            outgoing,
+            incoming,
+            {
+              duration: transitionDuration,
+              anchor,
+              incomingScale,
+              outgoingScale,
+              textAnimation,
+              debug,
             }
-          },
-          onEnter: () => {
-            console.log(`[Portal ${i}->${i+1}] ENTER scroll=${window.scrollY}px`)
-            incoming.style.visibility = 'visible'
-          },
-          onLeave: () => {
-            console.log(`[Portal ${i}->${i+1}] LEAVE scroll=${window.scrollY}px`)
-            outgoing.style.visibility = 'hidden'
-            outgoing.style.zIndex = '0'
-            incoming.style.zIndex = '20'
-          },
-          onEnterBack: () => {
-            console.log(`[Portal ${i}->${i+1}] ENTER_BACK scroll=${window.scrollY}px`)
-            outgoing.style.visibility = 'visible'
-            outgoing.style.zIndex = '20'
-            incoming.style.zIndex = '10'
-          },
-          onLeaveBack: () => {
-            console.log(`[Portal ${i}->${i+1}] LEAVE_BACK scroll=${window.scrollY}px`)
-            incoming.style.visibility = 'hidden'
-          },
-        })
+          )
+
+          // Create ScrollTrigger for this transition
+          const scrollEnd = scrollStart + transitionDuration * scrollSpeed
+
+          console.log(`[Portal ${i}->${i+1}] ScrollTrigger range: ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
+
+          ScrollTrigger.create({
+            trigger: containerEl,
+            start: `top+=${scrollStart} top`,
+            end: `+=${transitionDuration * scrollSpeed}`,
+            scrub: true,
+            markers: markers,
+            animation: timeline,
+            onUpdate: (self) => {
+              // Log portal progress every 25%
+              const progress = Math.round(self.progress * 100)
+              if (progress % 25 === 0) {
+                console.log(`[Portal ${i}->${i+1}] progress=${progress}% scroll=${Math.round(self.scroll())}px`)
+              }
+            },
+            onEnter: () => {
+              console.log(`[Portal ${i}->${i+1}] ENTER scroll=${window.scrollY}px`)
+              incoming.style.visibility = 'visible'
+            },
+            onLeave: () => {
+              console.log(`[Portal ${i}->${i+1}] LEAVE scroll=${window.scrollY}px`)
+              outgoing.style.visibility = 'hidden'
+              outgoing.style.zIndex = '0'
+              incoming.style.zIndex = '20'
+            },
+            onEnterBack: () => {
+              console.log(`[Portal ${i}->${i+1}] ENTER_BACK scroll=${window.scrollY}px`)
+              outgoing.style.visibility = 'visible'
+              outgoing.style.zIndex = '20'
+              incoming.style.zIndex = '10'
+            },
+            onLeaveBack: () => {
+              console.log(`[Portal ${i}->${i+1}] LEAVE_BACK scroll=${window.scrollY}px`)
+              incoming.style.visibility = 'hidden'
+            },
+          })
+        }
       }
 
     }, containerEl)

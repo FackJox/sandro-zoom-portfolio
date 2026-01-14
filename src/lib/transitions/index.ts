@@ -1,7 +1,7 @@
 /**
  * Transitions
  *
- * Scene transition system with exclusive routing and global state management.
+ * Scene transition system with exclusive routing.
  */
 
 export {
@@ -18,24 +18,17 @@ export {
   captureScene,
   mountCardFlipGrid,
   calculateGrid,
+  calculateScanDelays,
   getTargetTileSize,
-  lockScroll,
-  unlockScroll,
   type CardFlipTransitionConfig,
+  type ExecuteCardFlipConfig,
   type CardFlipGrid,
   type GridDimensions,
+  type TileDelay,
 } from './card-flip'
 
 export {
-  initSceneState,
-  resetSceneState,
-  getSceneState,
-  getActiveScene,
-  isTransitioning,
-  canTransitionForward,
-  canTransitionBackward,
-  startTransition,
-  completeTransition,
-  cancelTransition,
-  setActiveScene,
-} from './scene-state'
+  lockScroll,
+  unlockScroll,
+  isScrollLocked,
+} from './scroll-lock'

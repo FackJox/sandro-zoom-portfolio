@@ -10,6 +10,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { CustomEase } from 'gsap/CustomEase'
 import { Flip } from 'gsap/dist/Flip'
 import { TextPlugin } from 'gsap/dist/TextPlugin'
+import { Observer } from 'gsap/dist/Observer'
 // Note: ScrollSmoother, SplitText, DrawSVGPlugin, MotionPathPlugin
 // require GSAP Club membership. Uncomment when license is available.
 // import { ScrollSmoother } from 'gsap/ScrollSmoother'
@@ -31,6 +32,7 @@ export function registerGSAP(): void {
     CustomEase,
     Flip,
     TextPlugin,
+    Observer,
     // ScrollSmoother,
     // SplitText,
     // DrawSVGPlugin,
@@ -72,5 +74,5 @@ export function isGSAPRegistered(): boolean {
 }
 
 // Re-export GSAP and plugins for convenience
-export { gsap, ScrollTrigger, CustomEase, Flip, TextPlugin }
+export { gsap, ScrollTrigger, CustomEase, Flip, TextPlugin, Observer }
 // export { ScrollSmoother, SplitText, DrawSVGPlugin, MotionPathPlugin }
