@@ -24,6 +24,7 @@ export default defineConfig({
         colors: {
           // Primary
           'brand.primary': { value: '#0f171a' },        // Black Stallion - base of everything
+          'brand.bg': { value: '#0f171a' },             // Alias for primary - section backgrounds
           'brand.accent': { value: '#f6c605' },         // Egg Toast - danger/highlight color
 
           // Surfaces

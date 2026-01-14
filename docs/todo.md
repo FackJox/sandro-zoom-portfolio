@@ -8,10 +8,16 @@
 - remove section label change
 - film overview stack thumbnails - gif snippets of the film -- ffmpeg
 - overview stack fit vertically in mobile / single column or scrollable? 
+
 - funny logic when going backwards - some are shown twice
+- also wrong video shown on Afghanistan 
+
 - positions jump about, also instantly jumps between thumbnail position and videoplayer position in focus
+
 - remove beats in filmoverview
 - doesn't portal zoom out, About section's image just covers it
+
+- About - ken burns effect on the images
 
 - grid services transitions
 - 3d camera services transitions

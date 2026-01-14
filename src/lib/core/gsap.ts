@@ -47,6 +47,10 @@ export function registerGSAP(): void {
   CustomEase.create('ease-lock-on', 'M0,0 C0.19,1 0.22,1 1,1')
   CustomEase.create('ease-release', 'M0,0 C0.25,0 0.35,1 1,1')
 
+  // Card flip bounce easing - peaks at ~105% (≈190°), settles to 100% (180°)
+  // Creates the satisfying "overshoot and settle" effect
+  CustomEase.create('flipBounce', 'M0,0 C0.17,0.67 0.4,1.07 0.5,1.05 0.65,1.02 0.82,1 1,1')
+
   // DEBUG: Verify custom easings are registered
   if (typeof window !== 'undefined') {
     console.log('[GSAP] CustomEase registered')
