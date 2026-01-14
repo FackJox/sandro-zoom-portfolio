@@ -3,8 +3,6 @@
 - dark background on portal zoom, currently turns transparent which loses its effect
 - egg roll on portal zoom outline?
 
-- all copy and media is stacked on top of each other when page first loads
-- loader with background and sandro logo, a horizontaly split screen reveal when the content/ showreel has loaded
 
 - film overview stack clickable
 - remove section label change
