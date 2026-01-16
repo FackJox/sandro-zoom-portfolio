@@ -214,10 +214,10 @@
           // ============================================================
           const cardFlipConfig = transition.config as CardFlipTransitionConfig
 
-          // Calculate scroll positions
-          const targetScrollYForward = sceneStartTimes[i + 1] * scrollSpeed  // Where incoming scene starts
-          const targetScrollYReverse = sceneStartTimes[i] * scrollSpeed      // Where outgoing scene starts
+          // Calculate scroll positions - MUST be outside the trigger zone to prevent re-triggering
           const scrollEnd = scrollStart + transitionDuration * scrollSpeed
+          const targetScrollYForward = scrollEnd + 1  // Just past the trigger zone end
+          const targetScrollYReverse = scrollStart - 1  // Just before the trigger zone start
 
           // Track animation state: 'idle' | 'animating' | 'completed'
           let transitionState: 'idle' | 'animating' | 'forward-complete' | 'reverse-complete' = 'idle'
