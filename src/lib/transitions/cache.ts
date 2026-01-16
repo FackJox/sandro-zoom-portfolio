@@ -74,29 +74,25 @@ export async function warmCache(
 
   console.log(`[TransitionCache] Warming cache for ${key}...`)
 
+  // Store refs for resize recapture
+  sceneRefs = { about: aboutEl, services: servicesEl }
+
+  // Save visibility state at the start
+  const servicesWasHidden = servicesEl.style.visibility === 'hidden'
+  const servicesAutoAlpha = servicesEl.style.opacity
+
+  // Make services visible for capture
+  if (servicesWasHidden) {
+    servicesEl.style.visibility = 'visible'
+    servicesEl.style.opacity = '1'
+  }
+
   try {
-    // Store refs for resize recapture
-    sceneRefs = { about: aboutEl, services: servicesEl }
-
-    // Temporarily ensure services is visible for capture
-    const servicesWasHidden = servicesEl.style.visibility === 'hidden'
-    const servicesAutoAlpha = servicesEl.style.opacity
-    if (servicesWasHidden) {
-      servicesEl.style.visibility = 'visible'
-      servicesEl.style.opacity = '1'
-    }
-
     // Capture in parallel
     const [about, services] = await Promise.all([
       captureScene(aboutEl),
       captureScene(servicesEl),
     ])
-
-    // Restore services visibility
-    if (servicesWasHidden) {
-      servicesEl.style.visibility = 'hidden'
-      servicesEl.style.opacity = servicesAutoAlpha
-    }
 
     // Store in cache
     entries.set(key, { about, services, timestamp: Date.now() })
@@ -106,6 +102,12 @@ export async function warmCache(
   } catch (error) {
     console.error('[TransitionCache] Capture failed:', error)
     state = 'empty'
+  } finally {
+    // Always restore visibility, even on error
+    if (servicesWasHidden) {
+      servicesEl.style.visibility = 'hidden'
+      servicesEl.style.opacity = servicesAutoAlpha
+    }
   }
 }
 
@@ -130,6 +132,11 @@ export function getCanvases(): { about: HTMLCanvasElement; services: HTMLCanvasE
  * Invalidate all cached entries.
  */
 export function invalidate(): void {
+  // Release canvas GPU memory before clearing references
+  entries.forEach(entry => {
+    entry.about.width = 0
+    entry.services.width = 0
+  })
   entries.clear()
   state = 'empty'
   console.log('[TransitionCache] Cache invalidated')
@@ -210,6 +217,11 @@ export function setupResizeListener(): () => void {
  * Call this on component unmount.
  */
 export function destroyCache(): void {
+  // Release canvas GPU memory before clearing references
+  entries.forEach(entry => {
+    entry.about.width = 0
+    entry.services.width = 0
+  })
   entries.clear()
   state = 'empty'
   sceneRefs = null
