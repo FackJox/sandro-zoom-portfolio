@@ -188,9 +188,6 @@
         }
       })
 
-      // Track card flip state to prevent re-triggering
-      const cardFlipTriggered: Record<string, boolean> = {}
-
       // Create transitions between each pair of scenes
       for (let i = 0; i < sceneCount - 1; i++) {
         const outgoing = sceneElements[i] as HTMLElement
@@ -215,49 +212,95 @@
           // CARD FLIP TRANSITION
           // ============================================================
           const cardFlipConfig = transition.config as CardFlipTransitionConfig
-          const triggerKey = `${i}->${i + 1}`
 
-          // Calculate target scroll position (where incoming scene starts)
-          const targetScrollY = sceneStartTimes[i + 1] * scrollSpeed
+          // Calculate scroll positions
+          const targetScrollYForward = sceneStartTimes[i + 1] * scrollSpeed  // Where incoming scene starts
+          const targetScrollYReverse = sceneStartTimes[i] * scrollSpeed      // Where outgoing scene starts
+          const scrollEnd = scrollStart + transitionDuration * scrollSpeed
 
-          console.log(`[CardFlip ${i}->${i+1}] Setting up trigger at ${scrollStart.toFixed(0)}px, targetScrollY=${targetScrollY.toFixed(0)}px`)
+          // Track animation state: 'idle' | 'animating' | 'completed'
+          let transitionState: 'idle' | 'animating' | 'forward-complete' | 'reverse-complete' = 'idle'
+
+          console.log(`[CardFlip ${i}->${i+1}] Setting up trigger at ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
 
           ScrollTrigger.create({
             trigger: containerEl,
             start: `top+=${scrollStart} top`,
-            end: `top+=${scrollStart + 1} top`,  // Minimal range - just a trigger point
+            end: `top+=${scrollEnd} top`,
             markers: markers,
+
+            // FORWARD: Scrolling down into the trigger zone
             onEnter: async () => {
-              // Prevent re-triggering
-              if (cardFlipTriggered[triggerKey]) {
-                console.log(`[CardFlip ${i}->${i+1}] Already triggered, skipping`)
+              // Prevent re-triggering if already animating or completed forward
+              if (transitionState === 'animating' || transitionState === 'forward-complete') {
+                console.log(`[CardFlip ${i}->${i+1}] onEnter skipped, state=${transitionState}`)
                 return
               }
-              cardFlipTriggered[triggerKey] = true
+              transitionState = 'animating'
 
-              console.log(`[CardFlip ${i}->${i+1}] TRIGGERED at scroll=${window.scrollY}px`)
+              console.log(`[CardFlip ${i}->${i+1}] FORWARD triggered at scroll=${window.scrollY}px`)
 
-              // Execute the card flip transition
+              // Execute the card flip transition (forward)
               await executeCardFlipTransition(outgoing, incoming, {
                 ...cardFlipConfig,
-                targetScrollY,
-              })
+                targetScrollY: targetScrollYForward,
+              }, 'forward')
 
-              console.log(`[CardFlip ${i}->${i+1}] COMPLETE`)
+              transitionState = 'forward-complete'
+              console.log(`[CardFlip ${i}->${i+1}] FORWARD complete`)
             },
-            onLeaveBack: () => {
-              // Reset trigger state when scrolling back past the trigger point
-              // This allows the transition to be triggered again if user scrolls back
-              console.log(`[CardFlip ${i}->${i+1}] LEAVE_BACK - resetting trigger state`)
-              cardFlipTriggered[triggerKey] = false
 
-              // Restore outgoing scene, hide incoming
-              gsap.set(outgoing, { autoAlpha: 1 })
-              outgoing.style.visibility = 'visible'
-              outgoing.style.zIndex = '20'
-              gsap.set(incoming, { autoAlpha: 0 })
-              incoming.style.visibility = 'hidden'
-              incoming.style.zIndex = '10'
+            // REVERSE: Scrolling up into the trigger zone (from below)
+            onEnterBack: async () => {
+              // Prevent re-triggering if already animating or completed reverse
+              if (transitionState === 'animating' || transitionState === 'reverse-complete' || transitionState === 'idle') {
+                console.log(`[CardFlip ${i}->${i+1}] onEnterBack skipped, state=${transitionState}`)
+                return
+              }
+              transitionState = 'animating'
+
+              console.log(`[CardFlip ${i}->${i+1}] REVERSE triggered at scroll=${window.scrollY}px`)
+
+              // Execute the card flip transition (reverse)
+              // Note: For reverse, outgoing/incoming are swapped
+              await executeCardFlipTransition(incoming, outgoing, {
+                ...cardFlipConfig,
+                targetScrollY: targetScrollYReverse,
+              }, 'reverse')
+
+              transitionState = 'reverse-complete'
+              console.log(`[CardFlip ${i}->${i+1}] REVERSE complete`)
+            },
+
+            // Reset states when fully leaving the zone
+            onLeave: () => {
+              // Scrolled past the zone going down
+              console.log(`[CardFlip ${i}->${i+1}] onLeave - ensuring forward state`)
+              if (transitionState !== 'forward-complete') {
+                // Force correct state in case animation was interrupted
+                gsap.set(outgoing, { autoAlpha: 0 })
+                outgoing.style.visibility = 'hidden'
+                outgoing.style.zIndex = '0'
+                gsap.set(incoming, { autoAlpha: 1 })
+                incoming.style.visibility = 'visible'
+                incoming.style.zIndex = '20'
+                transitionState = 'forward-complete'
+              }
+            },
+
+            onLeaveBack: () => {
+              // Scrolled past the zone going up
+              console.log(`[CardFlip ${i}->${i+1}] onLeaveBack - ensuring reverse state`)
+              if (transitionState !== 'idle') {
+                // Force correct state - back to showing outgoing
+                gsap.set(outgoing, { autoAlpha: 1 })
+                outgoing.style.visibility = 'visible'
+                outgoing.style.zIndex = '20'
+                gsap.set(incoming, { autoAlpha: 0 })
+                incoming.style.visibility = 'hidden'
+                incoming.style.zIndex = '10'
+                transitionState = 'idle'
+              }
             },
           })
         } else {

@@ -189,9 +189,13 @@ export async function captureScene(sceneElement: HTMLElement): Promise<string> {
 /**
  * Create the flip grid DOM element with all tiles.
  * Includes digital visual treatment: 1px gaps, borders, scan lines.
+ *
+ * @param outgoingSnapshot - Base64 image of the outgoing scene (front face)
+ * @param incomingSnapshot - Base64 image of the incoming scene (back face)
  */
 export function createFlipGridElement(
-  snapshot: string,
+  outgoingSnapshot: string,
+  incomingSnapshot: string,
   dimensions: GridDimensions,
   tileDelays: TileDelay[]
 ): HTMLElement {
@@ -251,20 +255,20 @@ export function createFlipGridElement(
       position: relative;
     `
 
-    // Front face (shows snapshot slice) with border
+    // Front face (shows OUTGOING scene slice) with border
     const front = document.createElement('div')
     front.className = 'flip-tile-front'
     front.style.cssText = `
       position: absolute;
       inset: 0;
       backface-visibility: hidden;
-      background-image: url(${snapshot});
+      background-image: url(${outgoingSnapshot});
       background-size: ${viewportWidth}px ${viewportHeight}px;
       background-position: ${bgPosX}px ${bgPosY}px;
       box-shadow: inset 0 0 0 1px ${isGlitch ? COLORS.eggToastGlitch : COLORS.coverOfNight};
     `
 
-    // Back face (transparent - reveals incoming scene) with accent
+    // Back face (shows INCOMING scene slice) with accent
     const back = document.createElement('div')
     back.className = 'flip-tile-back'
     back.style.cssText = `
@@ -272,7 +276,9 @@ export function createFlipGridElement(
       inset: 0;
       backface-visibility: hidden;
       transform: rotateX(180deg);
-      background: transparent;
+      background-image: url(${incomingSnapshot});
+      background-size: ${viewportWidth}px ${viewportHeight}px;
+      background-position: ${bgPosX}px ${bgPosY}px;
       box-shadow: inset 0 0 0 1px ${COLORS.eggToast};
     `
 
@@ -336,9 +342,14 @@ function createFlipAnimation(
 
 /**
  * Mount the card flip grid and return control functions.
+ *
+ * @param outgoingSnapshot - Base64 image of the outgoing scene (front face)
+ * @param incomingSnapshot - Base64 image of the incoming scene (back face)
+ * @param config - Transition configuration
  */
 export function mountCardFlipGrid(
-  snapshot: string,
+  outgoingSnapshot: string,
+  incomingSnapshot: string,
   config: CardFlipTransitionConfig
 ): CardFlipGrid {
   const targetSize = getTargetTileSize()
@@ -356,7 +367,7 @@ export function mountCardFlipGrid(
     config.seed
   )
 
-  const element = createFlipGridElement(snapshot, dimensions, tileDelays)
+  const element = createFlipGridElement(outgoingSnapshot, incomingSnapshot, dimensions, tileDelays)
   document.body.appendChild(element)
 
   return {
@@ -378,11 +389,13 @@ export function mountCardFlipGrid(
  * @param outgoing - The outgoing scene element
  * @param incoming - The incoming scene element
  * @param config - Transition configuration including targetScrollY
+ * @param direction - 'forward' (default) or 'reverse' for scrolling back
  */
 export async function executeCardFlipTransition(
   outgoing: HTMLElement,
   incoming: HTMLElement,
-  config: ExecuteCardFlipConfig
+  config: ExecuteCardFlipConfig,
+  direction: 'forward' | 'reverse' = 'forward'
 ): Promise<void> {
   // Check for reduced motion preference
   const prefersReducedMotion = window.matchMedia(
@@ -405,40 +418,57 @@ export async function executeCardFlipTransition(
   lockScroll()
 
   try {
-    console.log('[CardFlip] Starting transition capture...')
+    console.log(`[CardFlip] Starting ${direction} transition capture...`)
 
-    // 2. Capture outgoing scene
-    const snapshot = await captureScene(outgoing)
-    console.log('[CardFlip] Scene captured')
+    // 2. Capture outgoing scene (currently visible)
+    const outgoingSnapshot = await captureScene(outgoing)
+    console.log('[CardFlip] Outgoing scene captured')
 
-    // 3. Position incoming underneath (visible but behind grid)
-    gsap.set(incoming, { autoAlpha: 1, zIndex: 0 })
+    // 3. Temporarily show incoming scene to capture it
+    const originalVisibility = incoming.style.visibility
+    const originalAutoAlpha = gsap.getProperty(incoming, 'autoAlpha')
+    gsap.set(incoming, { autoAlpha: 1 })
     incoming.style.visibility = 'visible'
 
-    // 4. Mount grid overlay
-    const grid = mountCardFlipGrid(snapshot, config)
+    // 4. Capture incoming scene
+    const incomingSnapshot = await captureScene(incoming)
+    console.log('[CardFlip] Incoming scene captured')
+
+    // 5. Hide incoming again (we'll reveal it via the grid)
+    gsap.set(incoming, { autoAlpha: 0 })
+    incoming.style.visibility = 'hidden'
+
+    // 6. Mount grid overlay with BOTH snapshots
+    // For forward: front=outgoing, back=incoming
+    // For reverse: front=incoming (which was outgoing), back=outgoing (which was incoming)
+    const frontSnapshot = direction === 'forward' ? outgoingSnapshot : incomingSnapshot
+    const backSnapshot = direction === 'forward' ? incomingSnapshot : outgoingSnapshot
+
+    const grid = mountCardFlipGrid(frontSnapshot, backSnapshot, config)
     console.log(`[CardFlip] Grid mounted: ${grid.dimensions.cols}x${grid.dimensions.rows} (${grid.tileDelays.filter(t => t.isGlitch).length} glitch tiles)`)
 
-    // 5. Hide outgoing DOM (grid shows the snapshot)
+    // 7. Hide outgoing DOM (grid shows its snapshot)
     gsap.set(outgoing, { autoAlpha: 0 })
+    outgoing.style.visibility = 'hidden'
 
-    // 6. Play flip animation
+    // 8. Play flip animation
     console.log('[CardFlip] Starting flip animation...')
     await grid.play()
     console.log('[CardFlip] Flip animation complete')
 
-    // 7. Cleanup grid
+    // 9. Cleanup grid
     grid.destroy()
 
-    // 8. Update z-index states (match portal behavior)
-    outgoing.style.visibility = 'hidden'
-    outgoing.style.zIndex = '0'
+    // 10. Show incoming, update z-index states
+    gsap.set(incoming, { autoAlpha: 1 })
+    incoming.style.visibility = 'visible'
     incoming.style.zIndex = '20'
+    outgoing.style.zIndex = '0'
 
     console.log('[CardFlip] Grid destroyed, transition complete')
 
   } finally {
-    // 9. Always unlock scroll, even if error
+    // 11. Always unlock scroll, even if error
     unlockScroll(config.targetScrollY)
   }
 }
