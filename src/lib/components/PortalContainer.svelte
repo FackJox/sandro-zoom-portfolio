@@ -67,6 +67,7 @@
   import { gsap, ScrollTrigger } from '../core/gsap'
   import { createPortalTransition, setupOutgoingScene, setupIncomingScene } from '../animation/primitives/portal'
   import { getTransition, isCardFlipTransition, executeCardFlipTransition } from '../transitions'
+  import { initCacheWarmup, setupResizeListener, destroyCache, isReady, warmCache } from '../transitions'
   import type { CardFlipTransitionConfig } from '../transitions'
 
   let {
@@ -368,6 +369,52 @@
     // Refresh ScrollTrigger after setup
     ScrollTrigger.refresh()
 
+    // ========================================================================
+    // TRANSITION CACHE WARMUP
+    // ========================================================================
+
+    // Find the About and Services scenes for cache warmup
+    const aboutScene = viewportEl!.querySelector('[data-scene="about"]') as HTMLElement
+    const servicesScene = viewportEl!.querySelector('[data-scene="services"]') as HTMLElement
+
+    if (aboutScene && servicesScene) {
+      // Initialize idle warmup
+      initCacheWarmup(aboutScene, servicesScene)
+
+      // Set up resize listener for cache invalidation
+      const cleanupResize = setupResizeListener()
+
+      // Store for cleanup
+      ;(ctx as any)._cacheCleanup = cleanupResize
+
+      // Proximity fallback: warm cache when user gets close to transition
+      // Find the card flip transition zone (scene 4 -> 5, which is About -> Services)
+      const cardFlipIndex = Array.from(sceneElements).findIndex(
+        (el) => (el as HTMLElement).dataset.scene === 'about'
+      )
+
+      if (cardFlipIndex !== -1 && cardFlipIndex < sceneCount - 1) {
+        const transitionStart = sceneStartTimes[cardFlipIndex + 1] - transitionDuration / 2
+        const proximityTriggerScroll = (transitionStart * scrollSpeed) - 500 // 500px before
+
+        ScrollTrigger.create({
+          trigger: containerEl,
+          start: `top+=${Math.max(0, proximityTriggerScroll)} top`,
+          onEnter: () => {
+            if (!isReady()) {
+              console.log('[PortalContainer] Proximity fallback - warming cache')
+              warmCache(aboutScene, servicesScene)
+            }
+          },
+          once: true, // Only need fallback once
+        })
+
+        console.log(`[PortalContainer] Cache proximity trigger at ${proximityTriggerScroll}px`)
+      }
+    } else {
+      console.warn('[PortalContainer] Could not find about/services scenes for cache warmup')
+    }
+
     // DIAGNOSTIC: Log scroll position periodically (flat)
     let lastLoggedScroll = -1000
     const scrollLogger = () => {
@@ -392,6 +439,10 @@
     if (ctx && (ctx as any)._scrollLogger) {
       window.removeEventListener('scroll', (ctx as any)._scrollLogger)
     }
+    if (ctx && (ctx as any)._cacheCleanup) {
+      ;(ctx as any)._cacheCleanup()
+    }
+    destroyCache()
     ctx?.revert()
   })
 </script>
