@@ -2,7 +2,7 @@
  * Card Flip Transition (Alpine Noir / Machine Archetype)
  *
  * Creates a grid of tiles that flip to reveal the incoming scene.
- * Uses scan corruption pattern with row-by-row animation and glitch tiles.
+ * Uses DOM cloning for pixel-perfect rendering (no screenshots).
  *
  * Visual Treatment:
  * - 1px gaps between tiles (Black Stallion visible through gaps)
@@ -11,8 +11,6 @@
  * - Scan line overlay on entire grid
  */
 
-import { domToCanvas } from 'modern-screenshot'
-import { getCanvases } from './cache'
 import { gsap } from '../core/gsap'
 import { lockScroll, unlockScroll } from './scroll-lock'
 
@@ -121,9 +119,6 @@ export function calculateGrid(
 
 /**
  * Calculate scan delays for row-by-row animation with variation and glitch tiles.
- *
- * Tiles flip in a scan pattern (top→bottom, left→right within each row)
- * with random timing variation to simulate data transmission latency.
  */
 export function calculateScanDelays(
   cols: number,
@@ -136,25 +131,20 @@ export function calculateScanDelays(
   const tileCount = cols * rows
   const delays: TileDelay[] = []
 
-  // Base delay per row (stagger spread across all rows)
   const rowDelay = staggerDuration / rows
 
   for (let i = 0; i < tileCount; i++) {
     const row = Math.floor(i / cols)
     const col = i % cols
 
-    // Base scan timing: row position + column offset within row
-    const colOffset = (col / cols) * rowDelay * 0.3  // 30% variation within row
+    const colOffset = (col / cols) * rowDelay * 0.3
     let delay = row * rowDelay + colOffset
 
-    // Add random "latency" variation (-10% to +10% of row delay)
     const latencyVariation = (rng() - 0.5) * 0.2 * rowDelay
     delay += latencyVariation
 
-    // 10% chance of glitch tile (flips at unexpected time)
     const isGlitch = rng() < glitchProbability
     if (isGlitch) {
-      // Glitch tiles flip either early or late (±30% of total stagger)
       const glitchOffset = (rng() - 0.5) * 0.6 * staggerDuration
       delay = Math.max(0, delay + glitchOffset)
     }
@@ -166,52 +156,130 @@ export function calculateScanDelays(
 }
 
 // ============================================================================
-// Scene Capture
+// DOM Cloning Utilities
 // ============================================================================
 
 /**
- * Capture a scene element as a canvas using modern-screenshot.
- * Returns the canvas directly (no base64 conversion).
+ * Create a deep clone of an element suitable for tile display.
+ * The clone is positioned with negative offset to show only the tile's region.
  */
-export async function captureScene(sceneElement: HTMLElement): Promise<HTMLCanvasElement> {
-  // Wait for all fonts to be loaded before capturing
-  await document.fonts.ready
+function createTileClone(
+  sourceElement: HTMLElement,
+  tileX: number,
+  tileY: number,
+  viewportWidth: number,
+  viewportHeight: number
+): HTMLElement {
+  // Clone the entire element tree
+  const clone = sourceElement.cloneNode(true) as HTMLElement
 
-  const canvas = await domToCanvas(sceneElement, {
-    scale: window.devicePixelRatio,
-    backgroundColor: null,
-    style: {
-      visibility: 'visible',
-      opacity: '1',
-    },
-    // Font embedding options
-    font: {
-      preferredFormat: 'woff2',
-    },
+  // Remove any IDs to prevent duplicates
+  clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))
+  clone.removeAttribute('id')
+
+  // DIAGNOSTIC: Check source element's actual position
+  const sourceRect = sourceElement.getBoundingClientRect()
+  if (tileX === 0 && tileY === 0) {
+    console.log('[CardFlip] Clone source check (tile 0,0):', {
+      sourceRect: { top: sourceRect.top, left: sourceRect.left, width: sourceRect.width, height: sourceRect.height },
+      cloneOffset: { left: -tileX, top: -tileY },
+      cloneSize: { width: viewportWidth, height: viewportHeight },
+      sourceOffsetFromViewport: { left: sourceRect.left, top: sourceRect.top },
+    })
+  }
+
+  // Position the clone so only the tile's region is visible
+  clone.style.cssText = `
+    position: absolute;
+    left: ${-tileX}px;
+    top: ${-tileY}px;
+    width: ${viewportWidth}px;
+    height: ${viewportHeight}px;
+    pointer-events: none;
+    margin: 0;
+    transform: none;
+    visibility: visible;
+    opacity: 1;
+  `
+
+  // Reset visibility/opacity on all children that may have GSAP inline styles
+  // This ensures cloned content is visible regardless of animation state
+  clone.querySelectorAll('[style*="visibility"], [style*="opacity"]').forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.style.visibility = 'visible'
+    htmlEl.style.opacity = '1'
   })
-  return canvas
+
+  return clone
 }
 
 // ============================================================================
-// Grid Creation (Alpine Noir Visual Treatment)
+// Grid Creation (DOM-Based)
 // ============================================================================
 
 /**
- * Create the flip grid DOM element with all tiles.
- * Includes digital visual treatment: 1px gaps, borders, scan lines.
- *
- * @param outgoingCanvas - Canvas of the outgoing scene (front face)
- * @param incomingCanvas - Canvas of the incoming scene (back face)
+ * Create the flip grid using DOM clones instead of canvas screenshots.
+ * Each tile contains a clone of the full scene, positioned to show only its region.
+ * This ensures pixel-perfect rendering with correct fonts and styles.
  */
 export function createFlipGridElement(
-  outgoingCanvas: HTMLCanvasElement,
-  incomingCanvas: HTMLCanvasElement,
+  outgoingElement: HTMLElement,
+  incomingElement: HTMLElement,
   dimensions: GridDimensions,
   tileDelays: TileDelay[]
 ): HTMLElement {
   const { cols, rows, tileWidth, tileHeight } = dimensions
 
-  // Create container with 1px gaps
+  // Use source element dimensions, not viewport (avoids scrollbar mismatch)
+  const outgoingRect = outgoingElement.getBoundingClientRect()
+  const sourceWidth = outgoingRect.width
+  const sourceHeight = outgoingRect.height
+
+  // DIAGNOSTIC: Log grid setup with sub-pixel analysis
+  const incomingRect = incomingElement.getBoundingClientRect()
+  const totalTileWidth = cols * tileWidth
+  const totalTileHeight = rows * tileHeight
+  const widthDiff = sourceWidth - totalTileWidth
+  const heightDiff = sourceHeight - totalTileHeight
+
+  console.log('[CardFlip] Grid setup:', {
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    outgoing: { width: sourceWidth, height: sourceHeight, top: outgoingRect.top, left: outgoingRect.left },
+    incoming: { width: incomingRect.width, height: incomingRect.height, top: incomingRect.top, left: incomingRect.left },
+    grid: { cols, rows, tileWidth: tileWidth.toFixed(4), tileHeight: tileHeight.toFixed(4) },
+    coverage: {
+      totalTileWidth: totalTileWidth.toFixed(4),
+      totalTileHeight: totalTileHeight.toFixed(4),
+      widthDiff: widthDiff.toFixed(4),
+      heightDiff: heightDiff.toFixed(4),
+    },
+    subPixel: {
+      tileWidthHasSubPixel: tileWidth !== Math.floor(tileWidth),
+      tileHeightHasSubPixel: tileHeight !== Math.floor(tileHeight),
+      cumulativeWidthError: (cols * (tileWidth - Math.floor(tileWidth))).toFixed(4),
+      cumulativeHeightError: (rows * (tileHeight - Math.floor(tileHeight))).toFixed(4),
+    },
+  })
+
+  // Check if outgoing and incoming have different dimensions/positions
+  if (Math.abs(outgoingRect.height - incomingRect.height) > 1) {
+    console.warn('[CardFlip] ⚠️ Height mismatch between outgoing/incoming:', {
+      outgoingHeight: outgoingRect.height,
+      incomingHeight: incomingRect.height,
+      diff: outgoingRect.height - incomingRect.height,
+    })
+  }
+
+  // Check if source is offset from viewport origin
+  if (Math.abs(outgoingRect.top) > 0.5 || Math.abs(outgoingRect.left) > 0.5) {
+    console.warn('[CardFlip] ⚠️ Source element is offset from viewport origin:', {
+      sourceTop: outgoingRect.top,
+      sourceLeft: outgoingRect.left,
+      'This may cause misalignment!': true,
+    })
+  }
+
+  // Create container - tiles fill 100%, no gaps
   const container = document.createElement('div')
   container.className = 'card-flip-grid'
   container.setAttribute('aria-hidden', 'true')
@@ -219,11 +287,6 @@ export function createFlipGridElement(
     position: fixed;
     inset: 0;
     z-index: 100;
-    display: grid;
-    grid-template-columns: repeat(${cols}, 1fr);
-    grid-template-rows: repeat(${rows}, 1fr);
-    gap: 1px;
-    background: ${COLORS.blackStallion};
     perspective: 1200px;
     pointer-events: none;
   `
@@ -246,80 +309,146 @@ export function createFlipGridElement(
   `
   container.appendChild(scanLines)
 
-  // Create tiles using canvas-to-canvas drawing
+  // Create tiles - exact fit, no gaps
+  // Cut lines are created with outline (doesn't affect layout)
   const tileCount = cols * rows
   for (let i = 0; i < tileCount; i++) {
     const col = i % cols
     const row = Math.floor(i / cols)
     const isGlitch = tileDelays[i]?.isGlitch ?? false
 
+    // Exact positioning - tiles fill viewport completely
+    const tileLeft = col * tileWidth
+    const tileTop = row * tileHeight
+
+    // DIAGNOSTIC: Log first tile of each row
+    if (col === 0) {
+      console.log(`[CardFlip] Row ${row} tile:`, {
+        tileLeft,
+        tileTop,
+        tileWidth,
+        tileHeight,
+        cloneOffset: { x: -tileLeft, y: -tileTop },
+      })
+    }
+
     const tile = document.createElement('div')
     tile.className = `flip-tile${isGlitch ? ' glitch' : ''}`
     tile.dataset.index = String(i)
+    tile.dataset.row = String(row)
     tile.style.cssText = `
       transform-style: preserve-3d;
-      position: relative;
+      position: absolute;
+      left: ${tileLeft}px;
+      top: ${tileTop}px;
+      width: ${tileWidth}px;
+      height: ${tileHeight}px;
     `
 
-    // Front face canvas (shows OUTGOING scene slice)
-    const frontCanvas = document.createElement('canvas')
-    frontCanvas.width = tileWidth * window.devicePixelRatio
-    frontCanvas.height = tileHeight * window.devicePixelRatio
-    frontCanvas.style.cssText = `
+    // Front face (shows OUTGOING scene region)
+    // Outline creates cut line effect without affecting layout
+    // Starts transparent, animated visible in wave pattern
+    const frontFace = document.createElement('div')
+    frontFace.className = 'flip-tile-front'
+    const frontOutlineColor = isGlitch ? COLORS.eggToastGlitch : COLORS.coverOfNight
+    frontFace.style.cssText = `
       position: absolute;
       inset: 0;
-      width: 100%;
-      height: 100%;
+      overflow: hidden;
       backface-visibility: hidden;
-      box-shadow: inset 0 0 0 1px ${isGlitch ? COLORS.eggToastGlitch : COLORS.coverOfNight};
+      outline: 1px solid transparent;
+      outline-offset: -1px;
     `
-    const frontCtx = frontCanvas.getContext('2d')
-    if (frontCtx) {
-      frontCtx.drawImage(
-        outgoingCanvas,
-        col * tileWidth * window.devicePixelRatio,
-        row * tileHeight * window.devicePixelRatio,
-        tileWidth * window.devicePixelRatio,
-        tileHeight * window.devicePixelRatio,
-        0,
-        0,
-        tileWidth * window.devicePixelRatio,
-        tileHeight * window.devicePixelRatio
-      )
-    }
+    frontFace.dataset.outlineColor = frontOutlineColor
+    // Clone uses source dimensions to match actual content size
+    const frontClone = createTileClone(outgoingElement, tileLeft, tileTop, sourceWidth, sourceHeight)
+    frontFace.appendChild(frontClone)
 
-    // Back face canvas (shows INCOMING scene slice)
-    const backCanvas = document.createElement('canvas')
-    backCanvas.width = tileWidth * window.devicePixelRatio
-    backCanvas.height = tileHeight * window.devicePixelRatio
-    backCanvas.style.cssText = `
+    // Back face (shows INCOMING scene region)
+    const backFace = document.createElement('div')
+    backFace.className = 'flip-tile-back'
+    backFace.style.cssText = `
       position: absolute;
       inset: 0;
-      width: 100%;
-      height: 100%;
+      overflow: hidden;
       backface-visibility: hidden;
       transform: rotateX(180deg);
-      box-shadow: inset 0 0 0 1px ${COLORS.eggToast};
+      outline: 1px solid transparent;
+      outline-offset: -1px;
     `
-    const backCtx = backCanvas.getContext('2d')
-    if (backCtx) {
-      backCtx.drawImage(
-        incomingCanvas,
-        col * tileWidth * window.devicePixelRatio,
-        row * tileHeight * window.devicePixelRatio,
-        tileWidth * window.devicePixelRatio,
-        tileHeight * window.devicePixelRatio,
-        0,
-        0,
-        tileWidth * window.devicePixelRatio,
-        tileHeight * window.devicePixelRatio
-      )
-    }
+    backFace.dataset.outlineColor = COLORS.eggToast
+    const backClone = createTileClone(incomingElement, tileLeft, tileTop, sourceWidth, sourceHeight)
+    backFace.appendChild(backClone)
 
-    tile.appendChild(frontCanvas)
-    tile.appendChild(backCanvas)
+    tile.appendChild(frontFace)
+    tile.appendChild(backFace)
     container.appendChild(tile)
   }
+
+  // DIAGNOSTIC: Verify grid coverage after creation
+  // First temporarily add to DOM to measure, then return
+  const tempParent = document.createElement('div')
+  tempParent.style.cssText = 'position: fixed; inset: 0; visibility: hidden; pointer-events: none;'
+  document.body.appendChild(tempParent)
+  tempParent.appendChild(container)
+
+  // Measure actual tile positions
+  const allTiles = container.querySelectorAll('.flip-tile')
+  const firstTile = allTiles[0] as HTMLElement
+  const lastTile = allTiles[allTiles.length - 1] as HTMLElement
+  const lastRow = rows - 1
+  const lastCol = cols - 1
+
+  if (firstTile && lastTile) {
+    const firstRect = firstTile.getBoundingClientRect()
+    const lastRect = lastTile.getBoundingClientRect()
+
+    // Expected positions
+    const expectedLastLeft = lastCol * tileWidth
+    const expectedLastTop = lastRow * tileHeight
+    const expectedLastRight = expectedLastLeft + tileWidth
+    const expectedLastBottom = expectedLastTop + tileHeight
+
+    console.log('[CardFlip] Tile position verification:', {
+      firstTile: {
+        expected: { top: 0, left: 0 },
+        actual: { top: firstRect.top.toFixed(2), left: firstRect.left.toFixed(2) },
+        diff: { top: firstRect.top.toFixed(2), left: firstRect.left.toFixed(2) },
+      },
+      lastTile: {
+        expected: { top: expectedLastTop.toFixed(2), left: expectedLastLeft.toFixed(2), right: expectedLastRight.toFixed(2), bottom: expectedLastBottom.toFixed(2) },
+        actual: { top: lastRect.top.toFixed(2), left: lastRect.left.toFixed(2), right: lastRect.right.toFixed(2), bottom: lastRect.bottom.toFixed(2) },
+      },
+      gridCoverage: {
+        actualRight: lastRect.right.toFixed(2),
+        actualBottom: lastRect.bottom.toFixed(2),
+        sourceWidth: sourceWidth.toFixed(2),
+        sourceHeight: sourceHeight.toFixed(2),
+        rightGap: (sourceWidth - lastRect.right).toFixed(2),
+        bottomGap: (sourceHeight - lastRect.bottom).toFixed(2),
+      },
+    })
+
+    // Warn if first tile isn't at origin
+    if (Math.abs(firstRect.top) > 1 || Math.abs(firstRect.left) > 1) {
+      console.warn('[CardFlip] ⚠️ First tile not at viewport origin:', {
+        topOffset: firstRect.top,
+        leftOffset: firstRect.left,
+      })
+    }
+
+    // Warn if grid doesn't cover source area
+    if (Math.abs(lastRect.right - sourceWidth) > 2 || Math.abs(lastRect.bottom - sourceHeight) > 2) {
+      console.warn('[CardFlip] ⚠️ Grid coverage mismatch:', {
+        rightMismatch: lastRect.right - sourceWidth,
+        bottomMismatch: lastRect.bottom - sourceHeight,
+      })
+    }
+  }
+
+  // Remove from temp parent, return container
+  tempParent.removeChild(container)
+  document.body.removeChild(tempParent)
 
   return container
 }
@@ -329,19 +458,26 @@ export function createFlipGridElement(
 // ============================================================================
 
 /**
- * Create and play the flip animation timeline.
- * Uses ease-lock-on for mechanical precision (no bounce/overshoot).
+ * Create and play the two-phase flip animation:
+ * 1. Wave reveal: Cutlines (outlines) appear row-by-row from top to bottom
+ * 2. Flip: Tiles flip to reveal incoming scene with stagger pattern
  */
 function createFlipAnimation(
   container: HTMLElement,
-  dimensions: GridDimensions,
   tileDelays: TileDelay[],
-  config: CardFlipTransitionConfig
+  config: CardFlipTransitionConfig,
+  rows: number
 ): Promise<void> {
   return new Promise((resolve) => {
     const tiles = container.querySelectorAll('.flip-tile')
+    const frontFaces = container.querySelectorAll('.flip-tile-front')
+    const backFaces = container.querySelectorAll('.flip-tile-back')
     const { duration, staggerDuration } = config
-    const flipDuration = duration - staggerDuration
+
+    // Phase timing
+    const revealDuration = 0.4 // Total time for wave reveal
+    const revealRowDelay = revealDuration / rows // Delay per row
+    const flipDuration = duration - staggerDuration - revealDuration
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -351,7 +487,42 @@ function createFlipAnimation(
         },
       })
 
-      // Use pre-calculated scan delays
+      // Phase 1: Wave reveal - show outlines row by row
+      tiles.forEach((tile, i) => {
+        const row = parseInt((tile as HTMLElement).dataset.row || '0', 10)
+        const rowDelay = row * revealRowDelay
+        const frontFace = frontFaces[i] as HTMLElement
+        const backFace = backFaces[i] as HTMLElement
+
+        if (frontFace && backFace) {
+          const frontColor = frontFace.dataset.outlineColor || COLORS.coverOfNight
+          const backColor = backFace.dataset.outlineColor || COLORS.eggToast
+
+          // Reveal outlines (cut lines) - instant appearance per row
+          tl.to(
+            frontFace,
+            {
+              outlineColor: frontColor,
+              duration: 0.01,
+              ease: 'none',
+            },
+            rowDelay
+          )
+          tl.to(
+            backFace,
+            {
+              outlineColor: backColor,
+              duration: 0.01,
+              ease: 'none',
+            },
+            rowDelay
+          )
+        }
+      })
+
+      // Phase 2: Flip animation starts after reveal completes
+      const flipStartTime = revealDuration
+
       tileDelays.forEach(({ index, delay }) => {
         const tile = tiles[index]
         if (!tile) return
@@ -361,9 +532,9 @@ function createFlipAnimation(
           {
             rotateX: 180,
             duration: flipDuration,
-            ease: 'ease-lock-on',  // Mechanical: fast acquisition, smooth settle
+            ease: 'ease-lock-on',
           },
-          delay
+          flipStartTime + delay
         )
       })
     }, container)
@@ -376,20 +547,18 @@ function createFlipAnimation(
 
 /**
  * Mount the card flip grid and return control functions.
- *
- * @param outgoingCanvas - Canvas of the outgoing scene (front face)
- * @param incomingCanvas - Canvas of the incoming scene (back face)
- * @param config - Transition configuration
  */
 export function mountCardFlipGrid(
-  outgoingCanvas: HTMLCanvasElement,
-  incomingCanvas: HTMLCanvasElement,
+  outgoingElement: HTMLElement,
+  incomingElement: HTMLElement,
   config: CardFlipTransitionConfig
 ): CardFlipGrid {
+  // Use source element dimensions, not viewport (avoids scrollbar mismatch)
+  const sourceRect = outgoingElement.getBoundingClientRect()
   const targetSize = getTargetTileSize()
   const dimensions = calculateGrid(
-    window.innerWidth,
-    window.innerHeight,
+    sourceRect.width,
+    sourceRect.height,
     targetSize
   )
 
@@ -401,14 +570,14 @@ export function mountCardFlipGrid(
     config.seed
   )
 
-  const element = createFlipGridElement(outgoingCanvas, incomingCanvas, dimensions, tileDelays)
+  const element = createFlipGridElement(outgoingElement, incomingElement, dimensions, tileDelays)
   document.body.appendChild(element)
 
   return {
     element,
     dimensions,
     tileDelays,
-    play: () => createFlipAnimation(element, dimensions, tileDelays, config),
+    play: () => createFlipAnimation(element, tileDelays, config, dimensions.rows),
     destroy: () => {
       if (element.parentNode) {
         element.parentNode.removeChild(element)
@@ -417,14 +586,12 @@ export function mountCardFlipGrid(
   }
 }
 
+// Track transition count for diagnostics
+let transitionCount = 0
+
 /**
  * Execute the complete card flip transition.
- * Uses pre-cached canvases when available, falls back to live capture.
- *
- * @param outgoing - The outgoing scene element
- * @param incoming - The incoming scene element
- * @param config - Transition configuration including targetScrollY
- * @param direction - 'forward' (default) or 'reverse' for scrolling back
+ * Uses DOM cloning for pixel-perfect rendering.
  */
 export async function executeCardFlipTransition(
   outgoing: HTMLElement,
@@ -432,13 +599,15 @@ export async function executeCardFlipTransition(
   config: ExecuteCardFlipConfig,
   direction: 'forward' | 'reverse' = 'forward'
 ): Promise<void> {
+  transitionCount++
+  const thisTransition = transitionCount
+
   // Check for reduced motion preference
   const prefersReducedMotion = window.matchMedia(
     '(prefers-reduced-motion: reduce)'
   ).matches
 
   if (prefersReducedMotion) {
-    // Instant transition, no flip
     gsap.set(outgoing, { autoAlpha: 0 })
     gsap.set(incoming, { autoAlpha: 1 })
     incoming.style.visibility = 'visible'
@@ -449,58 +618,106 @@ export async function executeCardFlipTransition(
     return
   }
 
-  // 1. Lock scroll immediately
   lockScroll()
 
   try {
-    console.log(`[CardFlip] Starting ${direction} transition...`)
+    console.log(`[CardFlip #${thisTransition}] Starting ${direction} transition (DOM-based)...`)
 
-    // 2. Try to get cached canvases
-    let outgoingCanvas: HTMLCanvasElement
-    let incomingCanvas: HTMLCanvasElement
+    // Ensure incoming is visible for cloning (but behind outgoing)
+    incoming.style.visibility = 'visible'
+    gsap.set(incoming, { autoAlpha: 1 })
 
-    const cached = getCanvases()
+    // DIAGNOSTIC: Full state comparison for first vs subsequent transitions
+    const outgoingRect = outgoing.getBoundingClientRect()
+    const incomingRect = incoming.getBoundingClientRect()
+    const outgoingStyles = window.getComputedStyle(outgoing)
+    const incomingStyles = window.getComputedStyle(incoming)
 
-    if (cached) {
-      console.log('[CardFlip] Using cached canvases')
-      // For forward: outgoing=about, incoming=services
-      // For reverse: outgoing=services, incoming=about
-      outgoingCanvas = direction === 'forward' ? cached.about : cached.services
-      incomingCanvas = direction === 'forward' ? cached.services : cached.about
-    } else {
-      // Fallback: capture live (shouldn't happen if warmup worked)
-      console.warn('[CardFlip] Cache miss - capturing live')
+    // Check parent containers too
+    const outgoingParent = outgoing.parentElement
+    const parentRect = outgoingParent?.getBoundingClientRect()
+    const parentStyles = outgoingParent ? window.getComputedStyle(outgoingParent) : null
 
-      outgoingCanvas = await captureScene(outgoing)
-
-      // Temporarily show incoming to capture
-      gsap.set(incoming, { autoAlpha: 1 })
-      incoming.style.visibility = 'visible'
-
-      incomingCanvas = await captureScene(incoming)
-
-      // Hide incoming again
-      gsap.set(incoming, { autoAlpha: 0 })
-      incoming.style.visibility = 'hidden'
+    console.log(`[CardFlip #${thisTransition}] === DIAGNOSTIC: TRANSITION ${thisTransition} ===`)
+    console.log(`[CardFlip #${thisTransition}] Window:`, {
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      scrollY: window.scrollY,
+      documentHeight: document.documentElement.scrollHeight,
+    })
+    console.log(`[CardFlip #${thisTransition}] Outgoing rect:`, {
+      top: outgoingRect.top,
+      left: outgoingRect.left,
+      width: outgoingRect.width,
+      height: outgoingRect.height,
+      bottom: outgoingRect.bottom,
+      right: outgoingRect.right,
+    })
+    console.log(`[CardFlip #${thisTransition}] Incoming rect:`, {
+      top: incomingRect.top,
+      left: incomingRect.left,
+      width: incomingRect.width,
+      height: incomingRect.height,
+      bottom: incomingRect.bottom,
+      right: incomingRect.right,
+    })
+    console.log(`[CardFlip #${thisTransition}] Outgoing styles:`, {
+      transform: outgoingStyles.transform,
+      position: outgoingStyles.position,
+      top: outgoingStyles.top,
+      left: outgoingStyles.left,
+      width: outgoingStyles.width,
+      height: outgoingStyles.height,
+      transformOrigin: outgoingStyles.transformOrigin,
+      scale: outgoingStyles.scale,
+    })
+    console.log(`[CardFlip #${thisTransition}] Incoming styles:`, {
+      transform: incomingStyles.transform,
+      position: incomingStyles.position,
+      top: incomingStyles.top,
+      left: incomingStyles.left,
+      width: incomingStyles.width,
+      height: incomingStyles.height,
+      transformOrigin: incomingStyles.transformOrigin,
+      scale: incomingStyles.scale,
+    })
+    if (outgoingParent && parentRect && parentStyles) {
+      console.log(`[CardFlip #${thisTransition}] Parent container:`, {
+        rect: { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height },
+        styles: { transform: parentStyles.transform, position: parentStyles.position, overflow: parentStyles.overflow },
+      })
     }
 
-    // 3. Mount grid overlay with canvases
-    const grid = mountCardFlipGrid(outgoingCanvas, incomingCanvas, config)
-    console.log(`[CardFlip] Grid mounted: ${grid.dimensions.cols}x${grid.dimensions.rows} (${grid.tileDelays.filter(t => t.isGlitch).length} glitch tiles)`)
+    // Check if outgoing/incoming rects differ (they should be same position)
+    if (Math.abs(outgoingRect.top - incomingRect.top) > 1 || Math.abs(outgoingRect.height - incomingRect.height) > 1) {
+      console.warn(`[CardFlip #${thisTransition}] ⚠️ RECT MISMATCH: outgoing vs incoming differ!`, {
+        topDiff: outgoingRect.top - incomingRect.top,
+        heightDiff: outgoingRect.height - incomingRect.height,
+      })
+    }
 
-    // 4. Hide outgoing DOM (grid shows its canvas)
+    // Check if source top is not 0 (would cause offset)
+    if (Math.abs(outgoingRect.top) > 1) {
+      console.warn(`[CardFlip #${thisTransition}] ⚠️ SOURCE OFFSET: outgoing.top = ${outgoingRect.top}px (expected 0)`)
+    }
+
+    // Mount grid with DOM clones
+    const grid = mountCardFlipGrid(outgoing, incoming, config)
+    console.log(`[CardFlip] Grid mounted: ${grid.dimensions.cols}x${grid.dimensions.rows}`)
+
+    // Hide original scenes (grid shows the clones)
     gsap.set(outgoing, { autoAlpha: 0 })
     outgoing.style.visibility = 'hidden'
+    gsap.set(incoming, { autoAlpha: 0 })
+    incoming.style.visibility = 'hidden'
 
-    // 5. Play flip animation
-    console.log('[CardFlip] Starting flip animation...')
+    // Play flip animation
     await grid.play()
-    console.log('[CardFlip] Flip animation complete')
 
-    // 6. Cleanup grid
+    // Cleanup grid
     grid.destroy()
 
-    // 7. Show incoming, update z-index states
+    // Show incoming, update z-index states
     gsap.set(incoming, { autoAlpha: 1 })
     incoming.style.visibility = 'visible'
     incoming.style.zIndex = '20'
@@ -509,7 +726,6 @@ export async function executeCardFlipTransition(
     console.log('[CardFlip] Transition complete')
 
   } finally {
-    // 8. Always unlock scroll, even if error
     unlockScroll(config.targetScrollY)
   }
 }

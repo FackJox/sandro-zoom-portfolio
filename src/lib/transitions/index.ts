@@ -15,7 +15,6 @@ export {
 
 export {
   executeCardFlipTransition,
-  captureScene,
   mountCardFlipGrid,
   calculateGrid,
   calculateScanDelays,
@@ -32,14 +31,3 @@ export {
   unlockScroll,
   isScrollLocked,
 } from './scroll-lock'
-
-export {
-  warmCache,
-  getCanvases,
-  invalidate,
-  isReady,
-  getState,
-  initCacheWarmup,
-  setupResizeListener,
-  destroyCache,
-} from './cache'

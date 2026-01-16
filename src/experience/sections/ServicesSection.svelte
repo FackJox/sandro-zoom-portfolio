@@ -9,10 +9,8 @@
   From: docs/plans/2025-01-05-ui-aesthetic-design.md
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
   import { css } from '$styled/css'
-  import { gsap, ScrollTrigger } from '$lib/core/gsap'
-  import { BRAND, DURATION } from '$lib/animation/easing'
+  import { DURATION } from '$lib/animation/easing'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
 
@@ -43,64 +41,9 @@
     }
   ]
 
-  // State
-  let containerEl: HTMLElement | null = $state(null)
-  let cardsContainerEl: HTMLElement | null = $state(null)
-  let ctx: gsap.Context | null = $state(null)
-
-  // Staggered reveal animation on mount
-  onMount(() => {
-    if (!containerEl || !cardsContainerEl) return
-
-    const portalContainer = document.querySelector('[data-portal-container]') as HTMLElement
-    if (!portalContainer) return
-
-    const viewport = portalContainer.querySelector('[style*="position: fixed"]')
-    if (!viewport) return
-
-    const allScenes = viewport.querySelectorAll('[data-scene]')
-    let sectionIndex = -1
-    allScenes.forEach((scene, i) => {
-      if (scene === containerEl) sectionIndex = i
-    })
-
-    if (sectionIndex < 0) return
-
-    const totalHeight = portalContainer.scrollHeight - window.innerHeight
-    const sceneCount = allScenes.length
-    const sceneHeight = totalHeight / sceneCount
-    const sectionStart = sectionIndex * sceneHeight
-
-    ctx = gsap.context(() => {
-      const cards = cardsContainerEl!.querySelectorAll('[data-service-card]')
-
-      // Set initial state - cards hidden
-      gsap.set(cards, {
-        autoAlpha: 0,
-        y: 30,
-      })
-
-      // Staggered reveal on scroll
-      ScrollTrigger.create({
-        trigger: portalContainer,
-        start: `top+=${sectionStart} top`,
-        onEnter: () => {
-          gsap.to(cards, {
-            autoAlpha: 1,
-            y: 0,
-            duration: DURATION.standard,
-            ease: BRAND.lockOn,
-            stagger: 0.15,
-          })
-        },
-        once: true,
-      })
-    })
-  })
-
-  onDestroy(() => {
-    ctx?.revert()
-  })
+  // Note: Previous staggered reveal animation removed.
+  // The card flip transition now handles the scene reveal, so
+  // content should be visible immediately for proper cloning.
 
   // Styles
   const containerStyles = css({
@@ -207,14 +150,14 @@
   })
 </script>
 
-<div bind:this={containerEl} class={containerStyles} data-scene="services">
+<div class={containerStyles} data-scene="services">
   <!-- Section Label -->
   <div class={labelContainerStyles}>
     <SectionLabel text="SERVICES" />
   </div>
 
   <!-- Service Cards -->
-  <div bind:this={cardsContainerEl} class={cardsContainerStyles}>
+  <div class={cardsContainerStyles}>
     {#each services as service}
       <div class={cardStyles} data-service-card>
         {#if service.externalLink}
