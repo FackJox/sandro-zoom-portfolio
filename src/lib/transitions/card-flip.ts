@@ -11,8 +11,58 @@
  * - Scan line overlay on entire grid
  */
 
-import { gsap } from '../core/gsap'
+import { gsap, ScrollTrigger } from '../core/gsap'
 import { lockScroll, unlockScroll } from './scroll-lock'
+
+// ============================================================================
+// Scrubbed Animation Sync
+// ============================================================================
+
+/**
+ * Force all scrubbed ScrollTrigger animations to their correct progress.
+ *
+ * When scroll position is set instantly (like after card-flip), scrubbed
+ * animations take time to catch up (based on scrub value). This function
+ * bypasses that delay by directly setting animation progress.
+ */
+function syncScrubbedAnimations(): void {
+  const triggers = ScrollTrigger.getAll()
+
+  triggers.forEach(st => {
+    // Only process scrubbed triggers with animations
+    if (!st.vars.scrub || !st.animation) return
+
+    // Get current scroll progress for this trigger
+    const scrollProgress = st.progress
+
+    // Force animation to match scroll progress immediately
+    st.animation.progress(scrollProgress)
+
+    console.log(`[CardFlip] Synced scrubbed animation: progress=${Math.round(scrollProgress * 100)}%`)
+  })
+}
+
+/**
+ * Force ContentSlab elements to their visible state.
+ *
+ * After card-flip reverse, we need to ensure ContentSlab is visible
+ * and stays visible even if the user's scroll momentum continues.
+ *
+ * @param sceneElement - The scene element to search within
+ */
+function forceContentSlabVisible(sceneElement: HTMLElement): void {
+  const contentSlab = sceneElement.querySelector('[data-content-slab]') as HTMLElement | null
+  if (!contentSlab) return
+
+  // Directly set to visible state
+  gsap.set(contentSlab, {
+    autoAlpha: 1,
+    x: 0,
+    y: 0,
+    overwrite: 'auto',
+  })
+  console.log('[CardFlip] Forced ContentSlab to visible state')
+}
 
 // ============================================================================
 // Brand Colors
@@ -623,6 +673,46 @@ export async function executeCardFlipTransition(
   try {
     console.log(`[CardFlip #${thisTransition}] Starting ${direction} transition (DOM-based)...`)
 
+    // Helper to safely get element identifier (handles SVG elements)
+    const getElementId = (el: Element): string => {
+      const cn = el.className
+      if (typeof cn === 'string' && cn) return cn.slice(0, 50)
+      if (cn && typeof cn === 'object' && 'baseVal' in cn) return (cn as SVGAnimatedString).baseVal?.slice(0, 50) || el.tagName
+      return el.tagName
+    }
+
+    // DIAGNOSTIC: Check for active tweens on outgoing scene elements
+    const outgoingElements = [outgoing, ...outgoing.querySelectorAll('*')]
+    const activeTweens: { element: string; progress: number; targets: string }[] = []
+    outgoingElements.forEach(el => {
+      const tweens = gsap.getTweensOf(el)
+      tweens.forEach(tween => {
+        const progress = tween.progress()
+        if (progress < 1) {
+          activeTweens.push({
+            element: getElementId(el),
+            progress: Math.round(progress * 100),
+            targets: tween.targets().map((t: any) => getElementId(t)).join(', ')
+          })
+        }
+      })
+    })
+    if (activeTweens.length > 0) {
+      console.warn(`[CardFlip #${thisTransition}] ⚠️ ACTIVE TWEENS on outgoing scene:`, activeTweens)
+    } else {
+      console.log(`[CardFlip #${thisTransition}] ✓ No active tweens on outgoing scene`)
+    }
+
+    // DIAGNOSTIC: Check scrubbed ScrollTriggers
+    const scrubbedTriggers = ScrollTrigger.getAll().filter(st => st.vars.scrub && st.animation)
+    scrubbedTriggers.forEach(st => {
+      const scrollProgress = st.progress
+      const animProgress = st.animation!.progress()
+      if (Math.abs(scrollProgress - animProgress) > 0.05) {
+        console.warn(`[CardFlip #${thisTransition}] ⚠️ SCRUB LAG: scroll=${Math.round(scrollProgress * 100)}% anim=${Math.round(animProgress * 100)}%`)
+      }
+    })
+
     // Ensure incoming is visible for cloning (but behind outgoing)
     incoming.style.visibility = 'visible'
     gsap.set(incoming, { autoAlpha: 1 })
@@ -717,7 +807,27 @@ export async function executeCardFlipTransition(
     // Cleanup grid
     grid.destroy()
 
-    // Show incoming, update z-index states
+    // IMPORTANT: Set scroll position and sync scrubbed animations BEFORE
+    // showing the incoming scene. This ensures that scrubbed animations
+    // (like ContentSlab in AboutScene) are at the correct progress when
+    // the scene becomes visible, preventing a visible "re-animation".
+    unlockScroll(config.targetScrollY)
+
+    // Force ScrollTrigger to recalculate all triggers' progress based on
+    // the new scroll position, then sync scrubbed animations immediately.
+    ScrollTrigger.update()
+    syncScrubbedAnimations()
+    console.log('[CardFlip] Scroll position set and scrubbed animations synced')
+
+    // For REVERSE transitions, force ContentSlab to visible state.
+    // This prevents the issue where user's scroll momentum continues after
+    // card-flip completes, causing the scrubbed animation to reverse and
+    // fade out the ContentSlab.
+    if (direction === 'reverse') {
+      forceContentSlabVisible(incoming)
+    }
+
+    // NOW show incoming scene with correct animation states
     gsap.set(incoming, { autoAlpha: 1 })
     incoming.style.visibility = 'visible'
     incoming.style.zIndex = '20'
@@ -725,7 +835,9 @@ export async function executeCardFlipTransition(
 
     console.log('[CardFlip] Transition complete')
 
-  } finally {
+  } catch (error) {
+    // On error, still need to unlock scroll
     unlockScroll(config.targetScrollY)
+    throw error
   }
 }

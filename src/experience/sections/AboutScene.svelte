@@ -119,47 +119,47 @@
         y: yOffset,
       })
 
-      // Build timeline for ContentSlab entry
-      // Phase 1 (0-40%): Portal zoom completes, image visible
-      // Phase 2 (40-70%): ContentSlab slides in
-      // Phase 3 (70-100%): Hold for reading
+      // Helper to check if ContentSlab needs animation
+      const needsReveal = () => {
+        const computedStyle = window.getComputedStyle(contentSlabWrapperEl!)
+        const opacity = parseFloat(computedStyle.opacity || '0')
+        return opacity < 0.5
+      }
+
+      // Helper to reveal ContentSlab with animation
+      const revealContentSlab = () => {
+        if (!needsReveal()) {
+          console.log(`[AboutScene ${id}] ContentSlab already visible, skipping animation`)
+          return
+        }
+        console.log(`[AboutScene ${id}] ContentSlab animation START`)
+        gsap.to(contentSlabWrapperEl, {
+          autoAlpha: 1,
+          x: 0,
+          y: 0,
+          duration: DURATION.standard, // ~0.55s
+          ease: BRAND.lockOn,
+          onComplete: () => console.log(`[AboutScene ${id}] ContentSlab animation COMPLETE`),
+        })
+      }
+
+      // ContentSlab entry animation - ONE-SHOT, does NOT reverse on scroll-up
+      // This prevents the issue where scrolling backward after card-flip causes
+      // the ContentSlab to fade out and slide back in.
       //
-      // IMPORTANT: Timeline must have total duration of 1.0 for proper scroll mapping
-      const tl = gsap.timeline()
+      // Timing: triggers at 40% of scene (after portal zoom completes)
+      const triggerScrollPosition = sectionStart + scrollRange * 0.4
 
-      // Dummy tween at start to establish timeline from 0
-      tl.set({}, {}, 0)
-
-      // ContentSlab entry animation at 40-70% of scene
-      tl.to(contentSlabWrapperEl, {
-        autoAlpha: 1,
-        x: 0,
-        y: 0,
-        duration: 0.3, // 30% of timeline (40% to 70%)
-        ease: BRAND.lockOn,
-        onStart: () => console.log(`[AboutScene ${id}] ContentSlab animation START`),
-        onComplete: () => console.log(`[AboutScene ${id}] ContentSlab animation COMPLETE`),
-      }, 0.4) // Start at 40%
-
-      // Dummy tween at end to ensure timeline duration is exactly 1.0
-      tl.set({}, {}, 1.0)
-
-      // Create ScrollTrigger for this scene's internal animations
       ScrollTrigger.create({
         trigger: portalContainer,
-        start: `top+=${sectionStart} top`,
-        end: `+=${scrollRange}`,
-        scrub: 1,
-        animation: tl,
-        onUpdate: (self) => {
-          const progress = Math.round(self.progress * 100)
-          if (progress % 25 === 0) {
-            console.log(`[AboutScene ${id}] progress=${progress}% scroll=${Math.round(self.scroll())}px tlProgress=${(tl.progress() * 100).toFixed(1)}%`)
-          }
-        },
+        start: `top+=${triggerScrollPosition} top`,
+        end: `top+=${triggerScrollPosition + 1} top`, // Minimal range
+        onEnter: revealContentSlab,
+        // Also reveal when entering from below (e.g., after card-flip reverse)
+        onEnterBack: revealContentSlab,
       })
 
-      console.log(`[AboutScene ${id}] ScrollTrigger created: start=${sectionStart}px end=${sectionEnd}px range=${scrollRange}px tlDuration=${tl.duration()}`)
+      console.log(`[AboutScene ${id}] ScrollTrigger created: triggerAt=${triggerScrollPosition}px (40% of ${sectionStart}px-${sectionEnd}px)`)
     }, containerEl)
 
     return () => {
