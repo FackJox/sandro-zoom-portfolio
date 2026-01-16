@@ -25,6 +25,6 @@
 	},
 	"dependencies": {
 		"gsap": "^3.14.2",
-		"html2canvas": "^1.4.1"
+		"modern-screenshot": "^4.6.7"
 	}
 }
