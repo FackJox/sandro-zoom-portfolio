@@ -41,6 +41,9 @@ function getCacheKey(): string {
 // ============================================================================
 
 async function captureScene(element: HTMLElement): Promise<HTMLCanvasElement> {
+  // Wait for all fonts to be loaded before capturing
+  await document.fonts.ready
+
   const canvas = await domToCanvas(element, {
     scale: window.devicePixelRatio,
     backgroundColor: null,
@@ -48,6 +51,12 @@ async function captureScene(element: HTMLElement): Promise<HTMLCanvasElement> {
       visibility: 'visible',
       opacity: '1',
     },
+    // Font embedding options
+    font: {
+      preferredFormat: 'woff2',
+    },
+    // Ensure all computed styles are captured
+    includeStyleProperties: undefined, // Include all
   })
   return canvas
 }

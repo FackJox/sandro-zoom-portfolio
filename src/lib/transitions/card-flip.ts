@@ -174,12 +174,19 @@ export function calculateScanDelays(
  * Returns the canvas directly (no base64 conversion).
  */
 export async function captureScene(sceneElement: HTMLElement): Promise<HTMLCanvasElement> {
+  // Wait for all fonts to be loaded before capturing
+  await document.fonts.ready
+
   const canvas = await domToCanvas(sceneElement, {
     scale: window.devicePixelRatio,
     backgroundColor: null,
     style: {
       visibility: 'visible',
       opacity: '1',
+    },
+    // Font embedding options
+    font: {
+      preferredFormat: 'woff2',
     },
   })
   return canvas
