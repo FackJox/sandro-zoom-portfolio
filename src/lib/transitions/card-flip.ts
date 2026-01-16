@@ -11,7 +11,8 @@
  * - Scan line overlay on entire grid
  */
 
-import html2canvas from 'html2canvas'
+import { domToCanvas } from 'modern-screenshot'
+import { getCanvases } from './cache'
 import { gsap } from '../core/gsap'
 import { lockScroll, unlockScroll } from './scroll-lock'
 
@@ -169,17 +170,19 @@ export function calculateScanDelays(
 // ============================================================================
 
 /**
- * Capture a scene element as a base64 image using html2canvas.
+ * Capture a scene element as a canvas using modern-screenshot.
+ * Returns the canvas directly (no base64 conversion).
  */
-export async function captureScene(sceneElement: HTMLElement): Promise<string> {
-  const canvas = await html2canvas(sceneElement, {
-    useCORS: true,
-    allowTaint: false,
+export async function captureScene(sceneElement: HTMLElement): Promise<HTMLCanvasElement> {
+  const canvas = await domToCanvas(sceneElement, {
     scale: window.devicePixelRatio,
-    logging: false,
     backgroundColor: null,
+    style: {
+      visibility: 'visible',
+      opacity: '1',
+    },
   })
-  return canvas.toDataURL('image/jpeg', 0.9)
+  return canvas
 }
 
 // ============================================================================
@@ -190,18 +193,16 @@ export async function captureScene(sceneElement: HTMLElement): Promise<string> {
  * Create the flip grid DOM element with all tiles.
  * Includes digital visual treatment: 1px gaps, borders, scan lines.
  *
- * @param outgoingSnapshot - Base64 image of the outgoing scene (front face)
- * @param incomingSnapshot - Base64 image of the incoming scene (back face)
+ * @param outgoingCanvas - Canvas of the outgoing scene (front face)
+ * @param incomingCanvas - Canvas of the incoming scene (back face)
  */
 export function createFlipGridElement(
-  outgoingSnapshot: string,
-  incomingSnapshot: string,
+  outgoingCanvas: HTMLCanvasElement,
+  incomingCanvas: HTMLCanvasElement,
   dimensions: GridDimensions,
   tileDelays: TileDelay[]
 ): HTMLElement {
   const { cols, rows, tileWidth, tileHeight } = dimensions
-  const viewportWidth = cols * tileWidth
-  const viewportHeight = rows * tileHeight
 
   // Create container with 1px gaps
   const container = document.createElement('div')
@@ -238,13 +239,11 @@ export function createFlipGridElement(
   `
   container.appendChild(scanLines)
 
-  // Create tiles
+  // Create tiles using canvas-to-canvas drawing
   const tileCount = cols * rows
   for (let i = 0; i < tileCount; i++) {
     const col = i % cols
     const row = Math.floor(i / cols)
-    const bgPosX = -(col * tileWidth)
-    const bgPosY = -(row * tileHeight)
     const isGlitch = tileDelays[i]?.isGlitch ?? false
 
     const tile = document.createElement('div')
@@ -255,35 +254,63 @@ export function createFlipGridElement(
       position: relative;
     `
 
-    // Front face (shows OUTGOING scene slice) with border
-    const front = document.createElement('div')
-    front.className = 'flip-tile-front'
-    front.style.cssText = `
+    // Front face canvas (shows OUTGOING scene slice)
+    const frontCanvas = document.createElement('canvas')
+    frontCanvas.width = tileWidth * window.devicePixelRatio
+    frontCanvas.height = tileHeight * window.devicePixelRatio
+    frontCanvas.style.cssText = `
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
       backface-visibility: hidden;
-      background-image: url(${outgoingSnapshot});
-      background-size: ${viewportWidth}px ${viewportHeight}px;
-      background-position: ${bgPosX}px ${bgPosY}px;
       box-shadow: inset 0 0 0 1px ${isGlitch ? COLORS.eggToastGlitch : COLORS.coverOfNight};
     `
+    const frontCtx = frontCanvas.getContext('2d')
+    if (frontCtx) {
+      frontCtx.drawImage(
+        outgoingCanvas,
+        col * tileWidth * window.devicePixelRatio,
+        row * tileHeight * window.devicePixelRatio,
+        tileWidth * window.devicePixelRatio,
+        tileHeight * window.devicePixelRatio,
+        0,
+        0,
+        tileWidth * window.devicePixelRatio,
+        tileHeight * window.devicePixelRatio
+      )
+    }
 
-    // Back face (shows INCOMING scene slice) with accent
-    const back = document.createElement('div')
-    back.className = 'flip-tile-back'
-    back.style.cssText = `
+    // Back face canvas (shows INCOMING scene slice)
+    const backCanvas = document.createElement('canvas')
+    backCanvas.width = tileWidth * window.devicePixelRatio
+    backCanvas.height = tileHeight * window.devicePixelRatio
+    backCanvas.style.cssText = `
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
       backface-visibility: hidden;
       transform: rotateX(180deg);
-      background-image: url(${incomingSnapshot});
-      background-size: ${viewportWidth}px ${viewportHeight}px;
-      background-position: ${bgPosX}px ${bgPosY}px;
       box-shadow: inset 0 0 0 1px ${COLORS.eggToast};
     `
+    const backCtx = backCanvas.getContext('2d')
+    if (backCtx) {
+      backCtx.drawImage(
+        incomingCanvas,
+        col * tileWidth * window.devicePixelRatio,
+        row * tileHeight * window.devicePixelRatio,
+        tileWidth * window.devicePixelRatio,
+        tileHeight * window.devicePixelRatio,
+        0,
+        0,
+        tileWidth * window.devicePixelRatio,
+        tileHeight * window.devicePixelRatio
+      )
+    }
 
-    tile.appendChild(front)
-    tile.appendChild(back)
+    tile.appendChild(frontCanvas)
+    tile.appendChild(backCanvas)
     container.appendChild(tile)
   }
 
@@ -343,13 +370,13 @@ function createFlipAnimation(
 /**
  * Mount the card flip grid and return control functions.
  *
- * @param outgoingSnapshot - Base64 image of the outgoing scene (front face)
- * @param incomingSnapshot - Base64 image of the incoming scene (back face)
+ * @param outgoingCanvas - Canvas of the outgoing scene (front face)
+ * @param incomingCanvas - Canvas of the incoming scene (back face)
  * @param config - Transition configuration
  */
 export function mountCardFlipGrid(
-  outgoingSnapshot: string,
-  incomingSnapshot: string,
+  outgoingCanvas: HTMLCanvasElement,
+  incomingCanvas: HTMLCanvasElement,
   config: CardFlipTransitionConfig
 ): CardFlipGrid {
   const targetSize = getTargetTileSize()
@@ -367,7 +394,7 @@ export function mountCardFlipGrid(
     config.seed
   )
 
-  const element = createFlipGridElement(outgoingSnapshot, incomingSnapshot, dimensions, tileDelays)
+  const element = createFlipGridElement(outgoingCanvas, incomingCanvas, dimensions, tileDelays)
   document.body.appendChild(element)
 
   return {
@@ -385,6 +412,7 @@ export function mountCardFlipGrid(
 
 /**
  * Execute the complete card flip transition.
+ * Uses pre-cached canvases when available, falls back to live capture.
  *
  * @param outgoing - The outgoing scene element
  * @param incoming - The incoming scene element
@@ -418,57 +446,63 @@ export async function executeCardFlipTransition(
   lockScroll()
 
   try {
-    console.log(`[CardFlip] Starting ${direction} transition capture...`)
+    console.log(`[CardFlip] Starting ${direction} transition...`)
 
-    // 2. Capture outgoing scene (currently visible)
-    const outgoingSnapshot = await captureScene(outgoing)
-    console.log('[CardFlip] Outgoing scene captured')
+    // 2. Try to get cached canvases
+    let outgoingCanvas: HTMLCanvasElement
+    let incomingCanvas: HTMLCanvasElement
 
-    // 3. Temporarily show incoming scene to capture it
-    const originalVisibility = incoming.style.visibility
-    const originalAutoAlpha = gsap.getProperty(incoming, 'autoAlpha')
-    gsap.set(incoming, { autoAlpha: 1 })
-    incoming.style.visibility = 'visible'
+    const cached = getCanvases()
 
-    // 4. Capture incoming scene
-    const incomingSnapshot = await captureScene(incoming)
-    console.log('[CardFlip] Incoming scene captured')
+    if (cached) {
+      console.log('[CardFlip] Using cached canvases')
+      // For forward: outgoing=about, incoming=services
+      // For reverse: outgoing=services, incoming=about
+      outgoingCanvas = direction === 'forward' ? cached.about : cached.services
+      incomingCanvas = direction === 'forward' ? cached.services : cached.about
+    } else {
+      // Fallback: capture live (shouldn't happen if warmup worked)
+      console.warn('[CardFlip] Cache miss - capturing live')
 
-    // 5. Hide incoming again (we'll reveal it via the grid)
-    gsap.set(incoming, { autoAlpha: 0 })
-    incoming.style.visibility = 'hidden'
+      outgoingCanvas = await captureScene(outgoing)
 
-    // 6. Mount grid overlay with BOTH snapshots
-    // For forward: front=outgoing, back=incoming
-    // For reverse: front=incoming (which was outgoing), back=outgoing (which was incoming)
-    const frontSnapshot = direction === 'forward' ? outgoingSnapshot : incomingSnapshot
-    const backSnapshot = direction === 'forward' ? incomingSnapshot : outgoingSnapshot
+      // Temporarily show incoming to capture
+      gsap.set(incoming, { autoAlpha: 1 })
+      incoming.style.visibility = 'visible'
 
-    const grid = mountCardFlipGrid(frontSnapshot, backSnapshot, config)
+      incomingCanvas = await captureScene(incoming)
+
+      // Hide incoming again
+      gsap.set(incoming, { autoAlpha: 0 })
+      incoming.style.visibility = 'hidden'
+    }
+
+    // 3. Mount grid overlay with canvases
+    const grid = mountCardFlipGrid(outgoingCanvas, incomingCanvas, config)
     console.log(`[CardFlip] Grid mounted: ${grid.dimensions.cols}x${grid.dimensions.rows} (${grid.tileDelays.filter(t => t.isGlitch).length} glitch tiles)`)
 
-    // 7. Hide outgoing DOM (grid shows its snapshot)
+    // 4. Hide outgoing DOM (grid shows its canvas)
     gsap.set(outgoing, { autoAlpha: 0 })
     outgoing.style.visibility = 'hidden'
 
-    // 8. Play flip animation
+    // 5. Play flip animation
     console.log('[CardFlip] Starting flip animation...')
     await grid.play()
     console.log('[CardFlip] Flip animation complete')
 
-    // 9. Cleanup grid
+    // 6. Cleanup grid
     grid.destroy()
 
-    // 10. Show incoming, update z-index states
+    // 7. Show incoming, update z-index states
     gsap.set(incoming, { autoAlpha: 1 })
     incoming.style.visibility = 'visible'
     incoming.style.zIndex = '20'
     outgoing.style.zIndex = '0'
 
-    console.log('[CardFlip] Grid destroyed, transition complete')
+    console.log('[CardFlip] Transition complete')
 
   } finally {
-    // 11. Always unlock scroll, even if error
+    // 8. Always unlock scroll, even if error
     unlockScroll(config.targetScrollY)
   }
 }
