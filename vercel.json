@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "git lfs install --skip-smudge && git lfs pull && npm install",
+  "installCommand": "git lfs install && git config lfs.url https://github.com/FackJox/sandro-zoom-portfolio.git/info/lfs && git lfs pull && npm install",
   "buildCommand": "npm run build"
 }
