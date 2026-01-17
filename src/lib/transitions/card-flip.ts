@@ -68,11 +68,15 @@ function forceContentSlabVisible(sceneElement: HTMLElement): void {
 // Brand Colors
 // ============================================================================
 
+// Brand colors from panda.config.ts
 const COLORS = {
-  blackStallion: '#0f171a',     // Background through gaps
-  coverOfNight: 'rgba(12, 16, 18, 0.2)',  // Front border
-  eggToast: 'rgba(244, 162, 97, 0.15)',   // Back accent
-  eggToastGlitch: 'rgba(244, 162, 97, 0.1)', // Glitch tile hint
+  blackStallion: '#0f171a',     // brand.primary - background through gaps
+  coverOfNight: 'rgba(70, 79, 76, 0.3)',   // brand.surfaceAlt at 30%
+  phantom: 'rgba(112, 121, 119, 0.4)',     // brand.phantom at 40%
+
+  // Egg Toast (#f6c605) - brand.accent - the cut line color
+  cutLineAccent: 'rgba(246, 198, 5, 0.85)',   // Bright gold cut
+  cutLineGlow: 'rgba(246, 198, 5, 0.15)',     // Subtle glow for glitch tiles
 }
 
 // ============================================================================
@@ -386,6 +390,7 @@ export function createFlipGridElement(
     tile.className = `flip-tile${isGlitch ? ' glitch' : ''}`
     tile.dataset.index = String(i)
     tile.dataset.row = String(row)
+    tile.dataset.col = String(col)
     tile.style.cssText = `
       transform-style: preserve-3d;
       position: absolute;
@@ -400,14 +405,14 @@ export function createFlipGridElement(
     // Starts transparent, animated visible in wave pattern
     const frontFace = document.createElement('div')
     frontFace.className = 'flip-tile-front'
-    const frontOutlineColor = isGlitch ? COLORS.eggToastGlitch : COLORS.coverOfNight
+    const frontOutlineColor = isGlitch ? COLORS.cutLineGlow : COLORS.phantom
     frontFace.style.cssText = `
       position: absolute;
       inset: 0;
       overflow: hidden;
       backface-visibility: hidden;
-      outline: 1px solid transparent;
-      outline-offset: -1px;
+      border: 0px solid transparent;
+      box-sizing: border-box;
     `
     frontFace.dataset.outlineColor = frontOutlineColor
     // Clone uses source dimensions to match actual content size
@@ -423,10 +428,10 @@ export function createFlipGridElement(
       overflow: hidden;
       backface-visibility: hidden;
       transform: rotateX(180deg);
-      outline: 1px solid transparent;
-      outline-offset: -1px;
+      border: 0px solid transparent;
+      box-sizing: border-box;
     `
-    backFace.dataset.outlineColor = COLORS.eggToast
+    backFace.dataset.outlineColor = COLORS.phantom
     const backClone = createTileClone(incomingElement, tileLeft, tileTop, sourceWidth, sourceHeight)
     backFace.appendChild(backClone)
 
@@ -508,26 +513,69 @@ export function createFlipGridElement(
 // ============================================================================
 
 /**
- * Create and play the two-phase flip animation:
- * 1. Wave reveal: Cutlines (outlines) appear row-by-row from top to bottom
- * 2. Flip: Tiles flip to reveal incoming scene with stagger pattern
+ * Create and play the multi-phase flip animation:
+ * 1a. Vertical cuts: Continuous vertical lines sweep left→right
+ * 1b. Horizontal cuts: Continuous horizontal lines sweep top→bottom
+ * 2.  Flip wave: Tiles flip to reveal incoming scene
+ * 3a. Horizontal uncut: Horizontal lines disappear bottom→top
+ * 3b. Vertical uncut: Vertical lines disappear right→left
  */
 function createFlipAnimation(
   container: HTMLElement,
   tileDelays: TileDelay[],
-  config: CardFlipTransitionConfig,
-  rows: number
+  _config: CardFlipTransitionConfig,
+  rows: number,
+  cols: number
 ): Promise<void> {
   return new Promise((resolve) => {
     const tiles = container.querySelectorAll('.flip-tile')
     const frontFaces = container.querySelectorAll('.flip-tile-front')
     const backFaces = container.querySelectorAll('.flip-tile-back')
-    const { duration, staggerDuration } = config
 
     // Phase timing
-    const revealDuration = 0.4 // Total time for wave reveal
-    const revealRowDelay = revealDuration / rows // Delay per row
-    const flipDuration = duration - staggerDuration - revealDuration
+    const verticalCutDuration = 0.4    // Vertical lines sweep
+    const horizontalCutDuration = 0.4  // Horizontal lines sweep
+    const gapBetweenCuts = 0.06        // Brief pause between cut phases
+    const gapBeforeFlip = 0.1          // Pause before flip starts
+
+    const horizontalCutStart = verticalCutDuration + gapBetweenCuts
+    const flipStartTime = horizontalCutStart + horizontalCutDuration + gapBeforeFlip
+    const flipDuration = 0.4
+    const maxStaggerDelay = Math.max(...tileDelays.map(t => t.delay))
+    const flipEndTime = flipStartTime + maxStaggerDelay + flipDuration
+
+    const gapAfterFlip = 0.1
+    const uncutStartTime = flipEndTime + gapAfterFlip
+    const horizontalUncutDuration = 0.3
+    const verticalUncutDuration = 0.3
+    const verticalUncutStart = uncutStartTime + horizontalUncutDuration + gapBetweenCuts
+
+    // Create seeded random for column/row variation
+    const rng = (() => {
+      let seed = 42
+      return () => {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff
+        return seed / 0x7fffffff
+      }
+    })()
+
+    // Pre-calculate column delays with randomness (for vertical cuts)
+    const colDelays: number[] = []
+    const baseColDelay = verticalCutDuration / cols
+    for (let c = 0; c < cols; c++) {
+      const variation = (rng() - 0.5) * baseColDelay * 0.5 // ±25% variation
+      colDelays.push(c * baseColDelay + variation)
+    }
+
+    // Pre-calculate row delays with randomness (for horizontal cuts)
+    const rowDelays: number[] = []
+    const baseRowDelay = horizontalCutDuration / rows
+    for (let r = 0; r < rows; r++) {
+      const variation = (rng() - 0.5) * baseRowDelay * 0.5 // ±25% variation
+      rowDelays.push(r * baseRowDelay + variation)
+    }
+
+    console.log(`[CardFlip] Timing: vCut=0-${verticalCutDuration}s (${cols} cols) hCut=${horizontalCutStart.toFixed(2)}-${(horizontalCutStart + horizontalCutDuration).toFixed(2)}s (${rows} rows) flip=${flipStartTime.toFixed(2)}s`)
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -537,42 +585,76 @@ function createFlipAnimation(
         },
       })
 
-      // Phase 1: Wave reveal - show outlines row by row
+      // Group tiles by column and row
+      const tilesByCol: Map<number, HTMLElement[]> = new Map()
+      const tilesByRow: Map<number, HTMLElement[]> = new Map()
+      const frontByCol: Map<number, HTMLElement[]> = new Map()
+      const frontByRow: Map<number, HTMLElement[]> = new Map()
+      const backByCol: Map<number, HTMLElement[]> = new Map()
+      const backByRow: Map<number, HTMLElement[]> = new Map()
+
       tiles.forEach((tile, i) => {
-        const row = parseInt((tile as HTMLElement).dataset.row || '0', 10)
-        const rowDelay = row * revealRowDelay
+        const tileEl = tile as HTMLElement
+        const col = parseInt(tileEl.dataset.col || '0', 10)
+        const row = parseInt(tileEl.dataset.row || '0', 10)
         const frontFace = frontFaces[i] as HTMLElement
         const backFace = backFaces[i] as HTMLElement
 
-        if (frontFace && backFace) {
-          const frontColor = frontFace.dataset.outlineColor || COLORS.coverOfNight
-          const backColor = backFace.dataset.outlineColor || COLORS.eggToast
+        if (!tilesByCol.has(col)) tilesByCol.set(col, [])
+        if (!tilesByRow.has(row)) tilesByRow.set(row, [])
+        if (!frontByCol.has(col)) frontByCol.set(col, [])
+        if (!frontByRow.has(row)) frontByRow.set(row, [])
+        if (!backByCol.has(col)) backByCol.set(col, [])
+        if (!backByRow.has(row)) backByRow.set(row, [])
 
-          // Reveal outlines (cut lines) - instant appearance per row
-          tl.to(
-            frontFace,
-            {
-              outlineColor: frontColor,
-              duration: 0.01,
-              ease: 'none',
-            },
-            rowDelay
-          )
-          tl.to(
-            backFace,
-            {
-              outlineColor: backColor,
-              duration: 0.01,
-              ease: 'none',
-            },
-            rowDelay
-          )
-        }
+        tilesByCol.get(col)!.push(tileEl)
+        tilesByRow.get(row)!.push(tileEl)
+        frontByCol.get(col)!.push(frontFace)
+        frontByRow.get(row)!.push(frontFace)
+        backByCol.get(col)!.push(backFace)
+        backByRow.get(row)!.push(backFace)
       })
 
-      // Phase 2: Flip animation starts after reveal completes
-      const flipStartTime = revealDuration
+      // Phase 1a: Vertical cuts - continuous lines sweep left→right
+      // All tiles in a column get their left/right borders at the same time
+      for (let c = 0; c < cols; c++) {
+        const delay = colDelays[c]
+        const fronts = frontByCol.get(c) || []
+        const backs = backByCol.get(c) || []
 
+        tl.to(
+          [...fronts, ...backs],
+          {
+            borderLeftWidth: '1px',
+            borderRightWidth: '1px',
+            borderColor: COLORS.cutLineAccent,
+            duration: 0.02,
+            ease: 'none',
+          },
+          delay
+        )
+      }
+
+      // Phase 1b: Horizontal cuts - continuous lines sweep top→bottom
+      // All tiles in a row get their top/bottom borders at the same time
+      for (let r = 0; r < rows; r++) {
+        const delay = horizontalCutStart + rowDelays[r]
+        const fronts = frontByRow.get(r) || []
+        const backs = backByRow.get(r) || []
+
+        tl.to(
+          [...fronts, ...backs],
+          {
+            borderTopWidth: '1px',
+            borderBottomWidth: '1px',
+            duration: 0.02,
+            ease: 'none',
+          },
+          delay
+        )
+      }
+
+      // Phase 2: Flip wave (outlines stay visible during flip)
       tileDelays.forEach(({ index, delay }) => {
         const tile = tiles[index]
         if (!tile) return
@@ -587,6 +669,47 @@ function createFlipAnimation(
           flipStartTime + delay
         )
       })
+
+      // Phase 3a: Horizontal uncut - continuous lines disappear bottom→top
+      // Reverse order: bottom rows first
+      for (let r = rows - 1; r >= 0; r--) {
+        const reverseIndex = rows - 1 - r
+        const delay = uncutStartTime + (reverseIndex * (horizontalUncutDuration / rows)) + (rng() - 0.5) * 0.03
+        const fronts = frontByRow.get(r) || []
+        const backs = backByRow.get(r) || []
+
+        tl.to(
+          [...fronts, ...backs],
+          {
+            borderTopWidth: '0px',
+            borderBottomWidth: '0px',
+            duration: 0.05,
+            ease: 'power1.out',
+          },
+          delay
+        )
+      }
+
+      // Phase 3b: Vertical uncut - continuous lines disappear right→left
+      // Reverse order: right columns first
+      for (let c = cols - 1; c >= 0; c--) {
+        const reverseIndex = cols - 1 - c
+        const delay = verticalUncutStart + (reverseIndex * (verticalUncutDuration / cols)) + (rng() - 0.5) * 0.03
+        const fronts = frontByCol.get(c) || []
+        const backs = backByCol.get(c) || []
+
+        tl.to(
+          [...fronts, ...backs],
+          {
+            borderLeftWidth: '0px',
+            borderRightWidth: '0px',
+            borderColor: 'transparent',
+            duration: 0.05,
+            ease: 'power1.out',
+          },
+          delay
+        )
+      }
     }, container)
   })
 }
@@ -627,7 +750,7 @@ export function mountCardFlipGrid(
     element,
     dimensions,
     tileDelays,
-    play: () => createFlipAnimation(element, tileDelays, config, dimensions.rows),
+    play: () => createFlipAnimation(element, tileDelays, config, dimensions.rows, dimensions.cols),
     destroy: () => {
       if (element.parentNode) {
         element.parentNode.removeChild(element)
