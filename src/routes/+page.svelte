@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { browser } from '$app/environment'
   import { registerGSAP } from '$lib/core/gsap'
   import { PortalContainer } from '$lib/components'
 
@@ -12,17 +11,8 @@
     ContactSection
   } from '$experience/sections'
 
-  // GSAP registration state - components wait until ready
-  let gsapReady = $state(false)
-
-  // Register GSAP on client and track when ready
-  $effect(() => {
-    if (browser && !gsapReady) {
-      registerGSAP().then(() => {
-        gsapReady = true
-      })
-    }
-  })
+  // Register GSAP plugins on mount
+  registerGSAP()
 
   // Loading state management
   let isLoading = $state(true)
@@ -83,35 +73,33 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 </svelte:head>
 
-{#if gsapReady}
-  <PortalContainer
-    sceneDurations={[16, 36, 8, 8, 8, 16, 16]}
-    scrollSpeed={65}
-    markers={false}
-    debug={true}
-  >
-    <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
-    <HeroShowreelScene onVideoReady={handleVideoReady} {entranceReady} {isLoading} />
+<PortalContainer
+  sceneDurations={[16, 36, 8, 8, 8, 16, 16]}
+  scrollSpeed={65}
+  markers={false}
+  debug={true}
+>
+  <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
+  <HeroShowreelScene onVideoReady={handleVideoReady} {entranceReady} {isLoading} />
 
-    <!-- Scene 2: Film Overview -->
-    <FilmOverviewSection />
+  <!-- Scene 2: Film Overview -->
+  <FilmOverviewSection />
 
-    <!-- Scenes 3-5: About (3 full-screen beats) -->
-    {#each aboutBeats as beat, i}
-      <AboutScene
-        id={beat.id}
-        beatIndex={i}
-        totalBeats={aboutBeats.length}
-        subtitle={beat.subtitle}
-        text={beat.text}
-        imageSrc={beat.imageSrc}
-      />
-    {/each}
+  <!-- Scenes 3-5: About (3 full-screen beats) -->
+  {#each aboutBeats as beat, i}
+    <AboutScene
+      id={beat.id}
+      beatIndex={i}
+      totalBeats={aboutBeats.length}
+      subtitle={beat.subtitle}
+      text={beat.text}
+      imageSrc={beat.imageSrc}
+    />
+  {/each}
 
-    <!-- Scene 6: Services -->
-    <ServicesSection />
+  <!-- Scene 6: Services -->
+  <ServicesSection />
 
-    <!-- Scene 7: Contact -->
-    <ContactSection />
-  </PortalContainer>
-{/if}
+  <!-- Scene 7: Contact -->
+  <ContactSection />
+</PortalContainer>
