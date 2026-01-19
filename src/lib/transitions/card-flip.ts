@@ -545,8 +545,7 @@ export function createFlipGridElement(
  * 1a. Vertical cuts: Continuous vertical lines sweep left→right
  * 1b. Horizontal cuts: Continuous horizontal lines sweep top→bottom
  * 2.  Flip wave: Tiles flip to reveal incoming scene
- * 3a. Horizontal uncut: Horizontal lines disappear bottom→top
- * 3b. Vertical uncut: Vertical lines disappear right→left
+ * 3.  Cut fade: All borders fade out together (no wave)
  */
 function createFlipAnimation(
   container: HTMLElement,
@@ -573,10 +572,8 @@ function createFlipAnimation(
     const flipEndTime = flipStartTime + maxStaggerDelay + flipDuration
 
     const gapAfterFlip = 0.1
-    const uncutStartTime = flipEndTime + gapAfterFlip
-    const horizontalUncutDuration = 0.3
-    const verticalUncutDuration = 0.3
-    const verticalUncutStart = uncutStartTime + horizontalUncutDuration + gapBetweenCuts
+    const cutFadeStartTime = flipEndTime + gapAfterFlip
+    const cutFadeDuration = 0.25  // Simple fade out duration
 
     // Create seeded random for column/row variation
     const rng = (() => {
@@ -603,7 +600,7 @@ function createFlipAnimation(
       rowDelays.push(r * baseRowDelay + variation)
     }
 
-    console.log(`[CardFlip] Timing: vCut=0-${verticalCutDuration}s (${cols} cols) hCut=${horizontalCutStart.toFixed(2)}-${(horizontalCutStart + horizontalCutDuration).toFixed(2)}s (${rows} rows) flip=${flipStartTime.toFixed(2)}s`)
+    console.log(`[CardFlip] Timing: vCut=0-${verticalCutDuration}s hCut=${horizontalCutStart.toFixed(2)}s flip=${flipStartTime.toFixed(2)}s cutFade=${cutFadeStartTime.toFixed(2)}s`)
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -698,46 +695,19 @@ function createFlipAnimation(
         )
       })
 
-      // Phase 3a: Horizontal uncut - continuous lines disappear bottom→top
-      // Reverse order: bottom rows first
-      for (let r = rows - 1; r >= 0; r--) {
-        const reverseIndex = rows - 1 - r
-        const delay = uncutStartTime + (reverseIndex * (horizontalUncutDuration / rows)) + (rng() - 0.5) * 0.03
-        const fronts = frontByRow.get(r) || []
-        const backs = backByRow.get(r) || []
-
-        tl.to(
-          [...fronts, ...backs],
-          {
-            borderTopWidth: '0px',
-            borderBottomWidth: '0px',
-            duration: 0.05,
-            ease: 'power1.out',
-          },
-          delay
-        )
-      }
-
-      // Phase 3b: Vertical uncut - continuous lines disappear right→left
-      // Reverse order: right columns first
-      for (let c = cols - 1; c >= 0; c--) {
-        const reverseIndex = cols - 1 - c
-        const delay = verticalUncutStart + (reverseIndex * (verticalUncutDuration / cols)) + (rng() - 0.5) * 0.03
-        const fronts = frontByCol.get(c) || []
-        const backs = backByCol.get(c) || []
-
-        tl.to(
-          [...fronts, ...backs],
-          {
-            borderLeftWidth: '0px',
-            borderRightWidth: '0px',
-            borderColor: 'transparent',
-            duration: 0.05,
-            ease: 'power1.out',
-          },
-          delay
-        )
-      }
+      // Phase 3: Cut fade - all borders fade out together
+      // Machine archetype: precise, no flourish. Borders simply disappear.
+      const allFaces = [...frontFaces, ...backFaces]
+      tl.to(
+        allFaces,
+        {
+          borderWidth: '0px',
+          borderColor: 'transparent',
+          duration: cutFadeDuration,
+          ease: 'power1.out',
+        },
+        cutFadeStartTime
+      )
     }, container)
   })
 }
