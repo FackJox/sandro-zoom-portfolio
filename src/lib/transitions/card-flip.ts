@@ -74,9 +74,10 @@ const COLORS = {
   coverOfNight: 'rgba(70, 79, 76, 0.3)',   // brand.surfaceAlt at 30%
   phantom: 'rgba(112, 121, 119, 0.4)',     // brand.phantom at 40%
 
-  // Egg Toast (#f6c605) - brand.accent - the cut line color
-  cutLineAccent: 'rgba(246, 198, 5, 0.85)',   // Bright gold cut
-  cutLineGlow: 'rgba(246, 198, 5, 0.15)',     // Subtle glow for glitch tiles
+  // Cut line colors - technical schematic aesthetic
+  // Cool phantom base, Egg Toast only as subtle warmth on glitch tiles
+  cutLineAccent: 'rgba(183, 198, 204, 0.18)',  // Tradewind - cool technical line
+  cutLineGlow: 'rgba(246, 198, 5, 0.12)',      // Hint of gold warmth for glitch
 }
 
 // ============================================================================
