@@ -259,17 +259,25 @@ function createTileClone(
     -webkit-backface-visibility: hidden;
   `
 
-  // Reset visibility/opacity on all children that may have GSAP inline styles
-  // This ensures cloned content is visible regardless of animation state
-  // Also ensure backface-visibility is set on ALL elements to prevent bleed-through
+  // Force visibility on ALL children to ensure cloned content is visible
+  // GSAP animations may have set opacity/visibility/autoAlpha on elements,
+  // and we need to override these regardless of their current value
   clone.querySelectorAll('*').forEach(el => {
     const htmlEl = el as HTMLElement
     if (htmlEl.style) {
-      // Reset any visibility/opacity from GSAP animations
-      if (htmlEl.style.visibility === 'hidden' || htmlEl.style.opacity === '0') {
-        htmlEl.style.visibility = 'visible'
-        htmlEl.style.opacity = '1'
+      // Force visibility and opacity on ALL elements, not just those detected as hidden
+      // This ensures elements animated by GSAP (including data-animate="text") are visible
+      htmlEl.style.visibility = 'visible'
+      htmlEl.style.opacity = '1'
+
+      // Reset transforms ONLY on data-animate elements (portal text animations)
+      // These elements have GSAP-applied x/y offsets that position them off-screen
+      // DO NOT reset transforms on other elements - they may use CSS transforms for
+      // positioning (e.g., ContentSlab uses translateY(-50%) for vertical centering)
+      if (htmlEl.hasAttribute('data-animate')) {
+        htmlEl.style.transform = 'none'
       }
+
       // Ensure backface-visibility is hidden on all children
       htmlEl.style.backfaceVisibility = 'hidden'
       htmlEl.style.setProperty('-webkit-backface-visibility', 'hidden')
