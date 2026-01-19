@@ -255,14 +255,25 @@ function createTileClone(
     transform: none;
     visibility: visible;
     opacity: 1;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   `
 
   // Reset visibility/opacity on all children that may have GSAP inline styles
   // This ensures cloned content is visible regardless of animation state
-  clone.querySelectorAll('[style*="visibility"], [style*="opacity"]').forEach(el => {
+  // Also ensure backface-visibility is set on ALL elements to prevent bleed-through
+  clone.querySelectorAll('*').forEach(el => {
     const htmlEl = el as HTMLElement
-    htmlEl.style.visibility = 'visible'
-    htmlEl.style.opacity = '1'
+    if (htmlEl.style) {
+      // Reset any visibility/opacity from GSAP animations
+      if (htmlEl.style.visibility === 'hidden' || htmlEl.style.opacity === '0') {
+        htmlEl.style.visibility = 'visible'
+        htmlEl.style.opacity = '1'
+      }
+      // Ensure backface-visibility is hidden on all children
+      htmlEl.style.backfaceVisibility = 'hidden'
+      htmlEl.style.setProperty('-webkit-backface-visibility', 'hidden')
+    }
   })
 
   return clone
@@ -335,6 +346,7 @@ export function createFlipGridElement(
   }
 
   // Create container - tiles fill 100%, no gaps
+  // Background prevents any bleed-through from original scenes behind
   const container = document.createElement('div')
   container.className = 'card-flip-grid'
   container.setAttribute('aria-hidden', 'true')
@@ -344,6 +356,7 @@ export function createFlipGridElement(
     z-index: 100;
     perspective: 1200px;
     pointer-events: none;
+    background: ${COLORS.blackStallion};
   `
 
   // Create scan line overlay
@@ -394,6 +407,7 @@ export function createFlipGridElement(
     tile.dataset.col = String(col)
     tile.style.cssText = `
       transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
       position: absolute;
       left: ${tileLeft}px;
       top: ${tileTop}px;
@@ -412,6 +426,9 @@ export function createFlipGridElement(
       inset: 0;
       overflow: hidden;
       backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform: translateZ(1px);
+      -webkit-transform: translateZ(1px);
       border: 0px solid transparent;
       box-sizing: border-box;
     `
@@ -428,7 +445,9 @@ export function createFlipGridElement(
       inset: 0;
       overflow: hidden;
       backface-visibility: hidden;
-      transform: rotateX(180deg);
+      -webkit-backface-visibility: hidden;
+      transform: rotateX(180deg) translateZ(1px);
+      -webkit-transform: rotateX(180deg) translateZ(1px);
       border: 0px solid transparent;
       box-sizing: border-box;
     `
