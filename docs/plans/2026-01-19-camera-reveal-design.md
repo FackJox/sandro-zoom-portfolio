@@ -171,20 +171,82 @@ gsap.to(htmlOpacity, {
 
 ## Captured Tweakpane Values
 
-From `/test-camera` positioning session:
+### Final Responsive Positions (from `/test-contact-scene`)
 
+**Mobile & Tablet (same values):**
+```json
+{
+  "rigGroup": {
+    "position": { "x": 0, "y": -1.5, "z": 0 },
+    "rotation": { "x": -0.16, "y": 0.03, "z": -0.03 },
+    "scale": 0.8
+  },
+  "viewerCamera": {
+    "position": { "x": 0, "y": 0, "z": 5 },
+    "fov": 50
+  }
+}
+```
+
+**Desktop:**
+```json
+{
+  "rigGroup": {
+    "position": { "x": 1.7, "y": -1.5, "z": 0.2 },
+    "rotation": { "x": -0.2, "y": -0.1, "z": 0 },
+    "scale": 0.8
+  },
+  "viewerCamera": {
+    "position": { "x": 0, "y": 0, "z": 5 },
+    "fov": 50
+  }
+}
+```
+
+### Camera Model & Screen (relative to rig, same for all breakpoints)
 ```json
 {
   "cameraModel": {
-    "position": { "x": 0.63, "y": -0.82, "z": 1.78 },
+    "position": { "x": 0.63, "y": -0.82, "z": 0 },
     "rotation": { "x": -1.59, "y": 0, "z": -3.14 },
     "scale": 0.023
   },
   "screenPlane": {
-    "position": { "x": 0, "y": 0.08, "z": 2.46 },
-    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "position": { "x": 0, "y": 0.08, "z": 0.68 },
     "scale": { "x": 1.6, "y": 0.9 }
   }
+}
+```
+
+### 3D Text Responsive Positions
+
+**Mobile:**
+```json
+{
+  "position": { "x": -1.3, "y": 3.1, "z": -2 },
+  "fontSize": 0.48,
+  "maxWidth": 2.8,
+  "color": "#ffffff"
+}
+```
+
+**Tablet:**
+```json
+{
+  "position": { "x": -2.4, "y": 2.9, "z": -2 },
+  "fontSize": 0.49,
+  "maxWidth": 4,
+  "color": "#ffffff"
+}
+```
+
+**Desktop:**
+```json
+{
+  "position": { "x": -4.8, "y": 2.9, "z": -2 },
+  "fontSize": 0.72,
+  "maxWidth": 6.8,
+  "color": "#ffffff"
 }
 ```
 
