@@ -58,12 +58,6 @@
     zIndex: '5',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
 </script>
 
 <div class={containerStyles} data-scene="showreel">
@@ -81,11 +75,14 @@
   <!-- Top gradient for label legibility -->
   <div class={gradientStyles}></div>
 
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text="SHOWREEL" />
-  </div>
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text="SHOWREEL" />
+    {/snippet}
 
-  <!-- Scroll Hint -->
-  <ScrollHint />
+    {#snippet bottomCenter()}
+      <ScrollHint />
+    {/snippet}
+  </UIChrome>
 </div>

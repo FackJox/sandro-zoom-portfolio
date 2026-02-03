@@ -59,13 +59,6 @@
     backgroundColor: 'brand.bg',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
-
   const cardsContainerStyles = css({
     display: 'flex',
     flexDirection: 'column',
@@ -152,11 +145,6 @@
 </script>
 
 <div class={containerStyles} data-scene="services">
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text="SERVICES" />
-  </div>
-
   <!-- Service Cards -->
   <div class={cardsContainerStyles}>
     {#each services as service}
@@ -180,6 +168,14 @@
     {/each}
   </div>
 
-  <!-- Scroll Hint -->
-  <ScrollHint />
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text="SERVICES" />
+    {/snippet}
+
+    {#snippet bottomCenter()}
+      <ScrollHint />
+    {/snippet}
+  </UIChrome>
 </div>
