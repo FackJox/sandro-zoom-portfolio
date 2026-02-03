@@ -81,17 +81,17 @@
 </script>
 
 <div class={containerStyles}>
-  <h2 class={titleStyles} data-animate="text">{title}</h2>
+  <h2 class={titleStyles} data-animate="text" data-direction="down">{title}</h2>
 
   {#if subtitle}
-    <p class={subtitleStyles} data-animate="text">{subtitle}</p>
+    <p class={subtitleStyles} data-animate="text" data-direction="down">{subtitle}</p>
   {/if}
 
   {#if client}
-    <p class={clientStyles} data-animate="text">{client}</p>
+    <p class={clientStyles} data-animate="text" data-direction="down">{client}</p>
   {/if}
 
   {#if description}
-    <p class={descriptionStyles} data-animate="text">{description}</p>
+    <p class={descriptionStyles} data-animate="text" data-direction="down">{description}</p>
   {/if}
 </div>

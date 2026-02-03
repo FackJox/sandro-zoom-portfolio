@@ -77,17 +77,17 @@
 </script>
 
 <div class={containerStyles}>
-  <h2 class={headlineStyles} data-animate="text">{headline}</h2>
+  <h2 class={headlineStyles} data-animate="text" data-direction="down">{headline}</h2>
 
   <div class={dividerStyles}></div>
 
   <div class={contactInfoStyles}>
     {#if phone}
-      <a href="tel:{phone}" class={valueStyles} data-animate="text">{phone}</a>
+      <a href="tel:{phone}" class={valueStyles} data-animate="text" data-direction="down">{phone}</a>
     {/if}
 
     {#if email}
-      <a href="mailto:{email}" class={valueStyles} data-animate="text">{email}</a>
+      <a href="mailto:{email}" class={valueStyles} data-animate="text" data-direction="down">{email}</a>
     {/if}
   </div>
 </div>

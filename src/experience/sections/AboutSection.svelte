@@ -193,7 +193,7 @@
     </div>
 
     <!-- Right: Content Slab -->
-    <div class={slabContainerStyles}>
+    <div class={slabContainerStyles} data-animate="slide" data-direction="right" data-direction-mobile="down">
       <ContentSlab
         eyebrow={currentBeat.subtitle}
         description={currentBeat.text}

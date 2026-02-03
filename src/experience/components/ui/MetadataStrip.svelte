@@ -37,7 +37,7 @@
   })
 </script>
 
-<div class={containerStyles} data-animate="text">
+<div class={containerStyles} data-animate="text" data-direction="down">
   {#each items as item, i}
     <span>{item}</span>
     {#if i < items.length - 1}

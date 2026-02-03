@@ -146,9 +146,9 @@
 
 <div class={containerStyles} data-scene="services">
   <!-- Service Cards -->
-  <div class={cardsContainerStyles}>
+  <div class={cardsContainerStyles} data-slide-group="alternating-h">
     {#each services as service}
-      <div class={cardStyles} data-service-card>
+      <div class={cardStyles} data-service-card data-animate="slide">
         {#if service.externalLink}
           <span class={cardTextStyles}>
             {service.title}{' '}

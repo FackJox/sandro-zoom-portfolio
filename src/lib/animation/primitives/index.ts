@@ -202,3 +202,17 @@ export {
   type PortalTextAnimationConfig,
   type PortalTimeline,
 } from './portal'
+
+// ============================================================================
+// Slide Direction Utilities
+// ============================================================================
+
+export {
+  getSlideDirection,
+  getMobileSlideDirection,
+  getGroupSlideDirections,
+  groupElementsByDirection,
+  getDirectionOffset,
+  type SlideGroupPattern,
+  type SlideDirectionConfig,
+} from './slide-direction'

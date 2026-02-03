@@ -99,10 +99,10 @@
 </script>
 
 <div class={containerStyles}>
-  <h2 class={titleStyles} data-animate="text">{title}</h2>
+  <h2 class={titleStyles} data-animate="text" data-direction="down">{title}</h2>
 
   {#if client || year}
-    <div class={metaStyles} data-animate="text">
+    <div class={metaStyles} data-animate="text" data-direction="down">
       {#if client}
         <span>{client}</span>
       {/if}
@@ -116,8 +116,8 @@
   {/if}
 
   {#if description}
-    <p class={descriptionStyles} data-animate="text">{description}</p>
+    <p class={descriptionStyles} data-animate="text" data-direction="down">{description}</p>
   {/if}
 
-  <div class={frameStyles} data-animate="text">2.39:1</div>
+  <div class={frameStyles} data-animate="text" data-direction="down">2.39:1</div>
 </div>

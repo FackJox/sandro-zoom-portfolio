@@ -53,6 +53,6 @@
 </script>
 
 <div class={containerStyles}>
-  <h3 class={subtitleStyles} data-animate="text">{subtitle}</h3>
-  <p class={textStyles} data-animate="text">{text}</p>
+  <h3 class={subtitleStyles} data-animate="text" data-direction="down">{subtitle}</h3>
+  <p class={textStyles} data-animate="text" data-direction="down">{text}</p>
 </div>

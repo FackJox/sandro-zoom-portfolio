@@ -26,7 +26,6 @@
   import BorderedViewport from '../components/ui/BorderedViewport.svelte'
   import ContentSlab from '../components/ui/ContentSlab.svelte'
   import StepIndicator from '../components/ui/StepIndicator.svelte'
-  import ScrollHint from '../components/ui/ScrollHint.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
 
   // Get portal context for scene durations
@@ -746,12 +745,13 @@
 
 <div bind:this={containerEl} class={containerStyles} data-scene="film-overview">
   <!-- Overview Grid (transforms during focus) -->
-  <div class={overviewGridStyles} data-overview-grid>
+  <div class={overviewGridStyles} data-overview-grid data-slide-group="nearest-edge" data-slide-group-mobile="alternating-h">
     {#each films as film, i}
       <div
         class={filmFrameStyles}
         data-film={film.id}
         data-index={i}
+        data-animate="slide"
       >
         <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
           <!-- Thumbnail Layer - visible in overview, crossfades out in focus -->
@@ -907,7 +907,6 @@
         {activeIndex}
         showLabels={true}
       />
-      <ScrollHint />
     {/snippet}
   </UIChrome>
 </div>

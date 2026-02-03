@@ -53,7 +53,7 @@
   )
 </script>
 
-<div class={containerStyles} data-animate="text">
+<div class={containerStyles} data-animate="text" data-direction="left">
   <span class={lineStyles}></span>
   <span bind:this={textRef} class={textStyles} data-section-label-text>{text}</span>
 </div>

@@ -51,7 +51,7 @@
 </script>
 
 <div class={containerStyles}>
-  {#each services as service}
-    <p class={serviceStyles} data-animate="text">{service}</p>
+  {#each services as service, i}
+    <p class={serviceStyles} data-animate="text" data-direction={i % 2 === 0 ? 'right' : 'left'}>{service}</p>
   {/each}
 </div>

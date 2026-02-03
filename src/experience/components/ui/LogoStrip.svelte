@@ -69,7 +69,7 @@
   })
 </script>
 
-<div class={containerStyles} data-animate="text">
+<div class={containerStyles} data-animate="text" data-direction="down">
   {#each logos as logo}
     <img class={logoStyles} src={logo.src} alt={logo.alt} loading="lazy" />
   {/each}

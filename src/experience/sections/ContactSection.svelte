@@ -221,7 +221,7 @@
   </UIChrome>
 
   <!-- Footer -->
-  <div class={footerStyles} data-animate="text">
+  <div class={footerStyles} data-animate="text" data-direction="down">
     <span class={footerItemStyles}>&copy; 2026 SANDRO GROMEN-HAYES</span>
     <span class={footerItemStyles}>HIGH ALTITUDE DOP</span>
   </div>
