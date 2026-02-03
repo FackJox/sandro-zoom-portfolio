@@ -17,6 +17,12 @@
  */
 
 import { gsap } from '../../core/gsap'
+import {
+  getGroupSlideDirections,
+  groupElementsByDirection,
+  getDirectionOffset,
+  type SlideGroupPattern,
+} from './slide-direction'
 
 // ============================================================================
 // Types
@@ -140,8 +146,15 @@ export function createPortalTransition(
   const tl = gsap.timeline({ paused: true })
 
   const anchorPoint = `${anchor.x} ${anchor.y}`
-  const clipStart = `circle(150% at ${anchorPoint})`
+
+  // Mask starts at 100%, becomes visible at corners around 70% (30% into animation)
+  // To show iris BEFORE zoom-out: delay scale, let mask shrink first
+  const clipStart = `circle(100% at ${anchorPoint})`
   const clipEnd = `circle(0% at ${anchorPoint})`
+
+  // Timing: mask runs full duration, scale is delayed 25% so iris appears first
+  const scaleDelay = duration * 0.25
+  const scaleDuration = duration * 0.75
 
   // Conditional debug logging
   const log = debug ? console.log.bind(console) : () => {}
@@ -149,7 +162,7 @@ export function createPortalTransition(
   log(`[Portal] Creating transition | duration=${duration}s anchor=${anchorPoint} scale=${incomingScale}`)
 
   // -------------------------------------------------------------------------
-  // Outgoing Scene: Scale (slower easing) - use fromTo for consistent behavior
+  // Outgoing Scene: Scale (DELAYED - starts after mask is visible)
   // -------------------------------------------------------------------------
   tl.fromTo(outgoingScene,
     {
@@ -158,16 +171,16 @@ export function createPortalTransition(
     },
     {
       scale: outgoingScale,
-      duration,
+      duration: scaleDuration,
       ease: 'portalScale',
       onStart: () => log('[Portal] Outgoing scale started'),
       onComplete: () => log('[Portal] Outgoing scale complete'),
     },
-    0
+    scaleDelay
   )
 
   // -------------------------------------------------------------------------
-  // Outgoing Scene: Mask (faster easing - creates iris effect)
+  // Outgoing Scene: Mask (starts immediately - iris visible before scale)
   // -------------------------------------------------------------------------
   tl.fromTo(outgoingScene,
     {
@@ -204,7 +217,7 @@ export function createPortalTransition(
   )
 
   // -------------------------------------------------------------------------
-  // Incoming Scene: Zoom-Out Reveal
+  // Incoming Scene: Zoom-Out Reveal (DELAYED to match outgoing scale)
   // CRITICAL: Large scale creates dramatic edge cropping that reveals as it
   // scales down, creating the signature "camera zooming out" sensation.
   // No opacity fade needed - scene is already visible behind outgoing.
@@ -215,12 +228,12 @@ export function createPortalTransition(
     },
     {
       scale: 1,
-      duration,
+      duration: scaleDuration,
       ease: 'portalIn',
       onStart: () => log('[Portal] Incoming zoom-out reveal started'),
       onComplete: () => log('[Portal] Incoming zoom-out reveal complete'),
     },
-    0
+    scaleDelay
   )
 
   // -------------------------------------------------------------------------
@@ -308,6 +321,120 @@ export function createPortalTransition(
         animStart
       )
     }
+
+    // -------------------------------------------------------------------------
+    // Incoming Slide Elements: Position-based directional animations
+    // Supports: data-animate="slide" with optional data-slide-group pattern
+    // -------------------------------------------------------------------------
+    const slideSelector = '[data-animate="slide"]'
+    const slideElements = gsap.utils.toArray(
+      (incomingEl as Element).querySelectorAll(slideSelector)
+    ) as Element[]
+
+    if (slideElements.length > 0) {
+      log('[Portal] Incoming slide elements:', slideElements.length)
+
+      const isMobile = window.innerWidth < 768
+
+      // Check for group pattern on parent containers
+      const processedElements = new Set<Element>()
+
+      // Find all containers with data-slide-group
+      const groupContainers = (incomingEl as Element).querySelectorAll('[data-slide-group]')
+
+      for (const container of groupContainers) {
+        const groupElements = gsap.utils.toArray(
+          container.querySelectorAll(slideSelector)
+        ) as Element[]
+
+        if (groupElements.length === 0) continue
+
+        // Get pattern (check for mobile override)
+        const desktopPattern = (container as HTMLElement).dataset.slideGroup as SlideGroupPattern
+        const mobilePattern = (container as HTMLElement).dataset.slideGroupMobile as SlideGroupPattern
+        const pattern = isMobile && mobilePattern ? mobilePattern : desktopPattern
+
+        log(`[Portal] Processing slide group: pattern=${pattern} isMobile=${isMobile} elements=${groupElements.length}`)
+
+        // Get directions for the group
+        const directions = getGroupSlideDirections(groupElements, pattern, isMobile)
+        const byDirection = groupElementsByDirection(directions)
+
+        // Animate each direction group
+        for (const [dir, elements] of Object.entries(byDirection)) {
+          if (elements.length === 0) continue
+
+          const offset = getDirectionOffset(dir as 'left' | 'right' | 'up' | 'down', distance)
+          log(`[Portal] Slide group direction=${dir} count=${elements.length}`)
+
+          tl.fromTo(elements,
+            { ...offset, opacity: 0 },
+            {
+              x: 0,
+              y: 0,
+              opacity: 1,
+              duration: animDuration,
+              stagger,
+              ease,
+            },
+            animStart
+          )
+        }
+
+        // Mark as processed
+        groupElements.forEach(el => processedElements.add(el))
+      }
+
+      // Process remaining slide elements not in groups
+      const ungroupedSlides = slideElements.filter(el => !processedElements.has(el))
+
+      for (const el of ungroupedSlides) {
+        const dataset = (el as HTMLElement).dataset
+
+        // Check for explicit direction or mobile override
+        let direction: 'left' | 'right' | 'up' | 'down'
+        if (isMobile && dataset.directionMobile) {
+          direction = dataset.directionMobile as 'left' | 'right' | 'up' | 'down'
+        } else if (dataset.direction) {
+          direction = dataset.direction as 'left' | 'right' | 'up' | 'down'
+        } else {
+          // Auto-detect based on position
+          const rect = el.getBoundingClientRect()
+          const centerX = (rect.left + rect.width / 2) / window.innerWidth
+          const centerY = (rect.top + rect.height / 2) / window.innerHeight
+
+          // Determine nearest edge
+          const distances = {
+            left: centerX,
+            right: 1 - centerX,
+            up: centerY,
+            down: 1 - centerY,
+          }
+
+          const closest = Object.entries(distances).reduce((a, b) =>
+            a[1] < b[1] ? a : b
+          )
+
+          direction = closest[1] > 0.3 ? 'down' : (closest[0] as typeof direction)
+        }
+
+        const offset = getDirectionOffset(direction, distance)
+        log(`[Portal] Individual slide element direction=${direction}`)
+
+        tl.fromTo(el,
+          { ...offset, opacity: 0 },
+          {
+            x: 0,
+            y: 0,
+            opacity: 1,
+            duration: animDuration,
+            stagger,
+            ease,
+          },
+          animStart
+        )
+      }
+    }
   }
 
   return {
@@ -336,6 +463,7 @@ export function setupOutgoingScene(
   const anchorPoint = `${anchor.x} ${anchor.y}`
 
   gsap.set(scene, {
+    // 150% fully covers viewport with no visible circle edge
     clipPath: `circle(150% at ${anchorPoint})`,
     scale: 1,
     opacity: 1,
