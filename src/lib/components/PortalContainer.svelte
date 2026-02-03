@@ -432,3 +432,14 @@
     {@render children()}
   </div>
 </div>
+
+<style>
+  /*
+   * FOUC Prevention: Hide non-first scenes immediately via CSS.
+   * This ensures scenes 2+ are hidden before JavaScript runs.
+   * The JS in onMount will take over visibility control afterwards.
+   */
+  :global([data-portal-container] [data-scene]:not(:first-of-type)) {
+    visibility: hidden;
+  }
+</style>

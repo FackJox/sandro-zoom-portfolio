@@ -269,11 +269,12 @@
   // Styles
 
   // Loader overlay - fades out when isLoading becomes false
+  // z-index 150: above UIChrome (100) but below logo content wrapper (200)
   const loaderOverlayStyles = css({
     position: 'absolute',
     inset: '0',
     backgroundColor: '#0f171a', // Black Stallion
-    zIndex: '100',
+    zIndex: '150',
     transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
     pointerEvents: 'none',
   })
