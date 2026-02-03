@@ -66,8 +66,8 @@
   import { onMount, onDestroy, setContext } from 'svelte'
   import { gsap, ScrollTrigger } from '../core/gsap'
   import { createPortalTransition, setupOutgoingScene, setupIncomingScene } from '../animation/primitives/portal'
-  import { getTransition, isCardFlipTransition, executeCardFlipTransition } from '../transitions'
-  import type { CardFlipTransitionConfig } from '../transitions'
+  import { getTransition, isCardFlipTransition, mountCardFlipGrid, prefersReducedMotion } from '../transitions'
+  import type { CardFlipTransitionConfig, CardFlipGrid } from '../transitions'
 
   let {
     totalDuration,
@@ -209,100 +209,123 @@
 
         if (useCardFlip) {
           // ============================================================
-          // CARD FLIP TRANSITION
+          // CARD FLIP TRANSITION (Scroll-Scrubbed)
           // ============================================================
           const cardFlipConfig = transition.config as CardFlipTransitionConfig
-
-          // Calculate scroll positions - MUST be outside the trigger zone to prevent re-triggering
           const scrollEnd = scrollStart + transitionDuration * scrollSpeed
-          const targetScrollYForward = scrollEnd + 1  // Just past the trigger zone end
-          const targetScrollYReverse = scrollStart - 1  // Just before the trigger zone start
 
-          // Track animation state: 'idle' | 'animating' | 'completed'
-          let transitionState: 'idle' | 'animating' | 'forward-complete' | 'reverse-complete' = 'idle'
+          console.log(`[CardFlip ${i}->${i+1}] Setting up scrubbed trigger at ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
 
-          console.log(`[CardFlip ${i}->${i+1}] Setting up trigger at ${scrollStart.toFixed(0)}px - ${scrollEnd.toFixed(0)}px`)
-
-          ScrollTrigger.create({
-            trigger: containerEl,
-            start: `top+=${scrollStart} top`,
-            end: `top+=${scrollEnd} top`,
-            markers: markers,
-
-            // FORWARD: Scrolling down into the trigger zone
-            onEnter: async () => {
-              // Prevent re-triggering if already animating or completed forward
-              if (transitionState === 'animating' || transitionState === 'forward-complete') {
-                console.log(`[CardFlip ${i}->${i+1}] onEnter skipped, state=${transitionState}`)
-                return
-              }
-              transitionState = 'animating'
-
-              console.log(`[CardFlip ${i}->${i+1}] FORWARD triggered at scroll=${window.scrollY}px`)
-
-              // Execute the card flip transition (forward)
-              await executeCardFlipTransition(outgoing, incoming, {
-                ...cardFlipConfig,
-                targetScrollY: targetScrollYForward,
-              }, 'forward')
-
-              transitionState = 'forward-complete'
-              console.log(`[CardFlip ${i}->${i+1}] FORWARD complete`)
-            },
-
-            // REVERSE: Scrolling up into the trigger zone (from below)
-            onEnterBack: async () => {
-              // Prevent re-triggering if already animating or completed reverse
-              if (transitionState === 'animating' || transitionState === 'reverse-complete' || transitionState === 'idle') {
-                console.log(`[CardFlip ${i}->${i+1}] onEnterBack skipped, state=${transitionState}`)
-                return
-              }
-              transitionState = 'animating'
-
-              console.log(`[CardFlip ${i}->${i+1}] REVERSE triggered at scroll=${window.scrollY}px`)
-
-              // Execute the card flip transition (reverse)
-              // Note: For reverse, outgoing/incoming are swapped
-              await executeCardFlipTransition(incoming, outgoing, {
-                ...cardFlipConfig,
-                targetScrollY: targetScrollYReverse,
-              }, 'reverse')
-
-              transitionState = 'reverse-complete'
-              console.log(`[CardFlip ${i}->${i+1}] REVERSE complete`)
-            },
-
-            // Reset states when fully leaving the zone
-            onLeave: () => {
-              // Scrolled past the zone going down
-              console.log(`[CardFlip ${i}->${i+1}] onLeave - ensuring forward state`)
-              if (transitionState !== 'forward-complete') {
-                // Force correct state in case animation was interrupted
+          // Check for reduced motion preference
+          if (prefersReducedMotion()) {
+            // Simple crossfade for reduced motion
+            ScrollTrigger.create({
+              trigger: containerEl,
+              start: `top+=${scrollStart} top`,
+              end: `top+=${scrollEnd} top`,
+              markers: markers,
+              onEnter: () => {
                 gsap.set(outgoing, { autoAlpha: 0 })
-                outgoing.style.visibility = 'hidden'
-                outgoing.style.zIndex = '0'
                 gsap.set(incoming, { autoAlpha: 1 })
                 incoming.style.visibility = 'visible'
+                outgoing.style.visibility = 'hidden'
+                outgoing.style.zIndex = '0'
                 incoming.style.zIndex = '20'
-                transitionState = 'forward-complete'
-              }
-            },
-
-            onLeaveBack: () => {
-              // Scrolled past the zone going up
-              console.log(`[CardFlip ${i}->${i+1}] onLeaveBack - ensuring reverse state`)
-              if (transitionState !== 'idle') {
-                // Force correct state - back to showing outgoing
+              },
+              onLeaveBack: () => {
                 gsap.set(outgoing, { autoAlpha: 1 })
-                outgoing.style.visibility = 'visible'
-                outgoing.style.zIndex = '20'
                 gsap.set(incoming, { autoAlpha: 0 })
+                outgoing.style.visibility = 'visible'
                 incoming.style.visibility = 'hidden'
+                outgoing.style.zIndex = '20'
                 incoming.style.zIndex = '10'
-                transitionState = 'idle'
-              }
-            },
-          })
+              },
+            })
+          } else {
+            // Full scroll-scrubbed card flip
+            let cardFlipGrid: CardFlipGrid | null = null
+            let cardFlipCtx: gsap.Context | null = null
+
+            // Mount the grid and create scrubbed animation
+            const mountGrid = (gridOutgoing: HTMLElement, gridIncoming: HTMLElement) => {
+              if (cardFlipGrid) return // Already mounted
+
+              // Ensure incoming is visible for cloning
+              gridIncoming.style.visibility = 'visible'
+              gsap.set(gridIncoming, { autoAlpha: 1 })
+
+              // Mount grid with DOM clones
+              cardFlipGrid = mountCardFlipGrid(gridOutgoing, gridIncoming, cardFlipConfig)
+
+              // Hide original scenes (grid shows the clones)
+              gsap.set(gridOutgoing, { autoAlpha: 0 })
+              gsap.set(gridIncoming, { autoAlpha: 0 })
+              gridOutgoing.style.visibility = 'hidden'
+              gridIncoming.style.visibility = 'hidden'
+
+              // Create scrubbed ScrollTrigger for the flip animation
+              cardFlipCtx = gsap.context(() => {
+                ScrollTrigger.create({
+                  trigger: containerEl,
+                  start: `top+=${scrollStart} top`,
+                  end: `top+=${scrollEnd} top`,
+                  animation: cardFlipGrid!.timeline,
+                  scrub: true,
+                })
+              })
+
+              console.log(`[CardFlip ${i}->${i+1}] Grid mounted, scrub active`)
+            }
+
+            // Unmount the grid and show appropriate scene
+            const unmountGrid = (showScene: HTMLElement, hideScene: HTMLElement) => {
+              if (!cardFlipGrid) return
+
+              cardFlipCtx?.revert()
+              cardFlipGrid.destroy()
+              cardFlipGrid = null
+              cardFlipCtx = null
+
+              // Show the appropriate scene
+              gsap.set(showScene, { autoAlpha: 1 })
+              showScene.style.visibility = 'visible'
+              showScene.style.zIndex = '20'
+
+              gsap.set(hideScene, { autoAlpha: 0 })
+              hideScene.style.visibility = 'hidden'
+              hideScene.style.zIndex = '10'
+
+              console.log(`[CardFlip ${i}->${i+1}] Grid unmounted`)
+            }
+
+            // Lifecycle ScrollTrigger for mount/unmount
+            ScrollTrigger.create({
+              trigger: containerEl,
+              start: `top+=${scrollStart} top`,
+              end: `top+=${scrollEnd} top`,
+              markers: markers,
+
+              onEnter: () => {
+                console.log(`[CardFlip ${i}->${i+1}] ENTER - mounting grid (forward)`)
+                mountGrid(outgoing, incoming)
+              },
+
+              onEnterBack: () => {
+                console.log(`[CardFlip ${i}->${i+1}] ENTER_BACK - mounting grid (reverse)`)
+                mountGrid(incoming, outgoing)
+              },
+
+              onLeave: () => {
+                console.log(`[CardFlip ${i}->${i+1}] LEAVE - unmounting, showing incoming`)
+                unmountGrid(incoming, outgoing)
+              },
+
+              onLeaveBack: () => {
+                console.log(`[CardFlip ${i}->${i+1}] LEAVE_BACK - unmounting, showing outgoing`)
+                unmountGrid(outgoing, incoming)
+              },
+            })
+          }
         } else {
           // ============================================================
           // PORTAL ZOOM TRANSITION

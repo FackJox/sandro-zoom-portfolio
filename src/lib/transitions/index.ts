@@ -14,13 +14,12 @@ export {
 } from './router'
 
 export {
-  executeCardFlipTransition,
   mountCardFlipGrid,
   calculateGrid,
-  calculateScanDelays,
+  calculateScrubDelays,
   getTargetTileSize,
+  prefersReducedMotion,
   type CardFlipTransitionConfig,
-  type ExecuteCardFlipConfig,
   type CardFlipGrid,
   type GridDimensions,
   type TileDelay,

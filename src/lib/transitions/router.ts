@@ -38,15 +38,13 @@ const DEFAULT_PORTAL_CONFIG: PortalTransitionConfig = {
 }
 
 /**
- * Alpine Noir / Machine archetype config:
- * - Scan corruption pattern (row-by-row)
- * - 10% glitch tiles
- * - ease-lock-on (no bounce)
+ * Scroll-scrubbed card flip config:
+ * - Row-by-row scan pattern with random variation
+ * - 10% glitch tiles (flip early/late)
  * - 150px desktop / 100px mobile tiles
+ * - Timing controlled by scroll (stagger spread: 60%, flip duration: 40%)
  */
 const DEFAULT_CARD_FLIP_CONFIG: CardFlipTransitionConfig = {
-  duration: 1.6,
-  staggerDuration: 0.8,
   glitchProbability: 0.1,
   seed: 42,
 }
