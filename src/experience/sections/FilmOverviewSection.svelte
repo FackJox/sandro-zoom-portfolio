@@ -27,6 +27,7 @@
   import ContentSlab from '../components/ui/ContentSlab.svelte'
   import StepIndicator from '../components/ui/StepIndicator.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   // Get portal context for scene durations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -549,25 +550,6 @@
     backgroundColor: 'brand.bg',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
-
-  const indicatorContainerStyles = css({
-    position: 'absolute',
-    bottom: '8vh',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: '10',
-
-    '@media (max-width: 767px)': {
-      bottom: '10vh',
-    },
-  })
-
   // Overview grid styles - transforms during focus
   const overviewGridStyles = css({
     position: 'absolute',
@@ -763,11 +745,6 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="film-overview">
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text={labelText} bind:textRef={labelTextEl} />
-  </div>
-
   <!-- Overview Grid (transforms during focus) -->
   <div class={overviewGridStyles} data-overview-grid>
     {#each films as film, i}
@@ -918,15 +895,19 @@
     {/key}
   </div>
 
-  <!-- Step Indicator -->
-  <div class={indicatorContainerStyles}>
-    <StepIndicator
-      {steps}
-      {activeIndex}
-      showLabels={true}
-    />
-  </div>
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text={labelText} bind:textRef={labelTextEl} />
+    {/snippet}
 
-  <!-- Scroll Hint -->
-  <ScrollHint />
+    {#snippet bottomCenter()}
+      <StepIndicator
+        {steps}
+        {activeIndex}
+        showLabels={true}
+      />
+      <ScrollHint />
+    {/snippet}
+  </UIChrome>
 </div>

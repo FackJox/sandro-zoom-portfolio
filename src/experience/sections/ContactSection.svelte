@@ -15,6 +15,7 @@
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ContactBlock from '../components/ui/ContactBlock.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   interface Props {
     backgroundSrc?: string
@@ -155,13 +156,6 @@
     pointerEvents: 'none',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
-
   // Contact positioned center
   const contactContainerStyles = css({
     position: 'relative',
@@ -214,15 +208,17 @@
   <!-- Dark Overlay -->
   <div class={overlayStyles}></div>
 
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text="CONTACT" />
-  </div>
-
   <!-- Contact Block (centered) -->
   <div class={contactContainerStyles}>
     <ContactBlock />
   </div>
+
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text="CONTACT" />
+    {/snippet}
+  </UIChrome>
 
   <!-- Footer -->
   <div class={footerStyles} data-animate="text">

@@ -43,21 +43,13 @@
   })
 
   const containerStyles = css({
-    position: 'absolute',
-    bottom: 'env(safe-area-inset-bottom, 40px)',
-    left: '50%',
-    transform: 'translateX(-50%)',
+    // No positioning - relies on parent (UIChrome) for placement
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '0.5rem',
-    zIndex: '20',
     pointerEvents: 'none',
     transition: `opacity ${DURATION.standard}s`,
-
-    '@media (max-width: 767px)': {
-      bottom: 'calc(env(safe-area-inset-bottom, 20px) + 20px)',
-    },
   })
 
   const chevronStyles = css({
