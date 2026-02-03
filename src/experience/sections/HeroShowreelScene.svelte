@@ -22,6 +22,7 @@
   import LogoStrip from '../components/ui/LogoStrip.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   // Get portal context for scene durations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -400,11 +401,7 @@
     transition: 'opacity 0.1s linear',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
+  const labelWrapperStyles = css({
     transition: 'opacity 0.1s linear',
   })
 </script>
@@ -470,14 +467,16 @@
     style:opacity={showreelLabelOpacity}
   ></div>
 
-  <!-- Showreel Label (fades in during transition) -->
-  <div
-    class={labelContainerStyles}
-    style:opacity={showreelLabelOpacity}
-  >
-    <SectionLabel text="SHOWREEL" />
-  </div>
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <div class={labelWrapperStyles} style:opacity={showreelLabelOpacity}>
+        <SectionLabel text="SHOWREEL" />
+      </div>
+    {/snippet}
 
-  <!-- Scroll Hint (always visible) -->
-  <ScrollHint />
+    {#snippet bottomCenter()}
+      <ScrollHint />
+    {/snippet}
+  </UIChrome>
 </div>

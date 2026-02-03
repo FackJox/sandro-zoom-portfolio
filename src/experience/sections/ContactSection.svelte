@@ -5,10 +5,14 @@
   Minimal layout, no scroll hint (final section).
 
   Design: Centered, minimal
+  Motion: Ken Burns effect on background - subtle camera drift
   From: docs/plans/2025-01-05-ui-aesthetic-design.md
 -->
 <script lang="ts">
+  import { onMount, onDestroy, getContext } from 'svelte'
   import { css } from '$styled/css'
+  import { gsap, ScrollTrigger } from '$lib/core/gsap'
+  import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ContactBlock from '../components/ui/ContactBlock.svelte'
 
@@ -17,6 +21,109 @@
   }
 
   let { backgroundSrc = '/pictures/Film Himal Sicker 01.jpg' }: Props = $props()
+
+  // Portal context for timing calculations
+  const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
+
+  // Element references
+  let containerEl: HTMLElement | null = $state(null)
+  let bgImageEl: HTMLImageElement | null = $state(null)
+  let ctx: gsap.Context | null = $state(null)
+
+  onMount(() => {
+    if (!containerEl || !bgImageEl) return
+
+    // Get portal container for scroll calculations
+    const portalContainer = document.querySelector('[data-portal-container]') as HTMLElement
+    if (!portalContainer) return
+
+    const viewport = portalContainer.querySelector('[style*="position: fixed"]')
+    if (!viewport) return
+
+    // Find this scene's index in the portal
+    const allScenes = viewport.querySelectorAll('[data-scene]')
+    let sceneIndex = -1
+    allScenes.forEach((scene, i) => {
+      if (scene === containerEl) sceneIndex = i
+    })
+
+    if (sceneIndex < 0) {
+      console.warn('[ContactSection] Scene not found in portal')
+      return
+    }
+
+    // Calculate scroll positions using portal context
+    let sectionStart: number
+    let sectionEnd: number
+
+    if (portalConfig && portalConfig.durations.length > 0) {
+      const startTimes = portalConfig.startTimes
+      const durations = portalConfig.durations
+      sectionStart = startTimes[sceneIndex] * portalConfig.scrollSpeed
+      sectionEnd = (startTimes[sceneIndex] + durations[sceneIndex]) * portalConfig.scrollSpeed
+
+      console.log(`[ContactSection] Using portal context: sceneIndex=${sceneIndex} sectionStart=${sectionStart}px sectionEnd=${sectionEnd}px`)
+    } else {
+      // Fallback to equal distribution
+      const totalHeight = portalContainer.scrollHeight - window.innerHeight
+      const sceneCount = allScenes.length
+      const sceneHeight = totalHeight / sceneCount
+      sectionStart = sceneIndex * sceneHeight
+      sectionEnd = (sceneIndex + 1) * sceneHeight
+    }
+
+    ctx = gsap.context(() => {
+      // ========================================================================
+      // Ken Burns Effect - Scroll-linked camera movement
+      // Brand Physics: Machine archetype - smooth, stabilized, like gimbal tracking
+      // Final section: gentle upward drift suggesting ascent/transcendence
+      // ========================================================================
+
+      // Ken Burns direction for contact: subtle upward drift
+      // Suggests looking up, aspiration, the final summit
+      const direction = { x: 10, y: -25 }
+
+      // Ken Burns parameters - subtle, cinematic ZOOM OUT
+      // Scale: 1.10 → 1.0 (starts pushed in, pulls back to reveal)
+      // Harmonizes with portal zoom-out transitions
+      const kenBurnsScale = { from: 1.10, to: 1.0 }
+
+      // Set initial state - start zoomed in with offset
+      gsap.set(bgImageEl, {
+        scale: kenBurnsScale.from,
+        x: direction.x,
+        y: direction.y,
+        transformOrigin: '50% 50%',
+      })
+
+      // Create scroll-linked Ken Burns timeline
+      // Zooms OUT as you scroll - "pulling back to reveal"
+      const kenBurnsTl = gsap.timeline()
+
+      kenBurnsTl.to(bgImageEl, {
+        scale: kenBurnsScale.to,
+        x: 0,
+        y: 0,
+        ease: 'none', // Linear for scroll-scrub
+        duration: 1,
+      })
+
+      // Attach to scroll
+      ScrollTrigger.create({
+        trigger: portalContainer,
+        start: `top+=${sectionStart} top`,
+        end: `top+=${sectionEnd} top`,
+        scrub: 1.5, // Smooth scrub - gimbal stabilization feel
+        animation: kenBurnsTl,
+      })
+
+      console.log(`[ContactSection] Ken Burns (zoom-out): start=(${direction.x}, ${direction.y}) @ ${kenBurnsScale.from}x → end=(0, 0) @ ${kenBurnsScale.to}x`)
+    }, containerEl)
+  })
+
+  onDestroy(() => {
+    ctx?.revert()
+  })
 
   const containerStyles = css({
     position: 'absolute',
@@ -94,9 +201,10 @@
   })
 </script>
 
-<div class={containerStyles} data-scene="contact">
-  <!-- Background Image -->
+<div bind:this={containerEl} class={containerStyles} data-scene="contact">
+  <!-- Background Image with Ken Burns effect -->
   <img
+    bind:this={bgImageEl}
     class={bgImageStyles}
     src={backgroundSrc}
     alt=""

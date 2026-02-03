@@ -13,6 +13,7 @@
   import { DURATION } from '$lib/animation/easing'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   // Service card data
   interface ServiceCard {

@@ -16,6 +16,7 @@
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ContentSlab from '../components/ui/ContentSlab.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   interface Props {
     /** Unique scene identifier */
@@ -50,6 +51,7 @@
   // Element references
   let containerEl: HTMLElement | null = $state(null)
   let contentSlabWrapperEl: HTMLElement | null = $state(null)
+  let bgImageEl: HTMLImageElement | null = $state(null)
   let ctx: gsap.Context | null = $state(null)
 
   // Responsive check
@@ -109,6 +111,62 @@
     const scrollRange = sectionEnd - sectionStart
 
     ctx = gsap.context(() => {
+      // ========================================================================
+      // Ken Burns Effect - Scroll-linked camera movement
+      // Brand Physics: Machine archetype - smooth, stabilized, like gimbal tracking
+      // ========================================================================
+
+      // Directional variation based on beat index for visual interest
+      // Each beat gets a different pan direction, mimicking varied camera angles
+      const kenBurnsDirections = [
+        { x: -20, y: -15 },   // Beat 0: drift up-left (frontline perspective)
+        { x: 25, y: -10 },    // Beat 1: drift up-right (origin story)
+        { x: -15, y: 20 },    // Beat 2: drift down-left (values)
+      ]
+      const direction = kenBurnsDirections[beatIndex % kenBurnsDirections.length]
+
+      // Ken Burns parameters - subtle, cinematic ZOOM OUT
+      // Scale: 1.12 → 1.0 (starts pushed in, pulls back to reveal)
+      // Harmonizes with portal zoom-out transitions
+      const kenBurnsScale = { from: 1.12, to: 1.0 }
+
+      if (bgImageEl) {
+        // Set initial state for Ken Burns - start zoomed in with offset
+        gsap.set(bgImageEl, {
+          scale: kenBurnsScale.from,
+          x: direction.x,
+          y: direction.y,
+          transformOrigin: '50% 50%',
+        })
+
+        // Create scroll-linked Ken Burns timeline
+        // Zooms OUT as you scroll - "pulling back to reveal the full picture"
+        const kenBurnsTl = gsap.timeline()
+
+        kenBurnsTl.to(bgImageEl, {
+          scale: kenBurnsScale.to,
+          x: 0,
+          y: 0,
+          ease: 'none', // Linear for scroll-scrub (no easing - scrub handles smoothness)
+          duration: 1, // Normalized - ScrollTrigger scrub controls actual timing
+        })
+
+        // Attach to scroll - scrub creates the smooth, mechanical feel
+        ScrollTrigger.create({
+          trigger: portalContainer,
+          start: `top+=${sectionStart} top`,
+          end: `top+=${sectionEnd} top`,
+          scrub: 1.5, // Smooth scrub - mimics gimbal stabilization lag
+          animation: kenBurnsTl,
+        })
+
+        console.log(`[AboutScene ${id}] Ken Burns (zoom-out): start=(${direction.x}, ${direction.y}) @ ${kenBurnsScale.from}x → end=(0, 0) @ ${kenBurnsScale.to}x`)
+      }
+
+      // ========================================================================
+      // ContentSlab Animation
+      // ========================================================================
+
       // Set initial state - ContentSlab hidden and offset
       const xOffset = isMobile ? 0 : 100
       const yOffset = isMobile ? 100 : 0
@@ -188,13 +246,6 @@
     objectFit: 'cover',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
-
   const contentSlabWrapperStyles = css({
     position: 'absolute',
     zIndex: '20',
@@ -221,19 +272,10 @@
     },
   })
 
-  const beatIndicatorContainerStyles = css({
-    position: 'absolute',
-    bottom: '8vh',
-    left: '50%',
-    transform: 'translateX(-50%)',
+  const beatIndicatorStyles = css({
     display: 'flex',
     alignItems: 'center',
     gap: '0.75rem',
-    zIndex: '10',
-
-    '@media (max-width: 767px)': {
-      bottom: '4vh',
-    },
   })
 
   const beatDotStyles = css({
@@ -251,17 +293,13 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="about-{id}">
-  <!-- Full-bleed background image -->
+  <!-- Full-bleed background image with Ken Burns effect -->
   <img
+    bind:this={bgImageEl}
     src={imageSrc}
     alt={imageAlt}
     class={imageStyles}
   />
-
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text="ABOUT ME" />
-  </div>
 
   <!-- ContentSlab - slides in after portal zoom -->
   <div bind:this={contentSlabWrapperEl} class={contentSlabWrapperStyles} data-content-slab>
@@ -271,14 +309,22 @@
     />
   </div>
 
-  <!-- Beat Indicators -->
-  <div class={beatIndicatorContainerStyles}>
-    {#each Array(totalBeats) as _, i}
-      <div
-        class={beatDotStyles}
-        data-active={i === beatIndex}
-        aria-label="About section {i + 1} of {totalBeats}"
-      ></div>
-    {/each}
-  </div>
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text="ABOUT ME" />
+    {/snippet}
+
+    {#snippet bottomCenter()}
+      <div class={beatIndicatorStyles}>
+        {#each Array(totalBeats) as _, i}
+          <div
+            class={beatDotStyles}
+            data-active={i === beatIndex}
+            aria-label="About section {i + 1} of {totalBeats}"
+          ></div>
+        {/each}
+      </div>
+    {/snippet}
+  </UIChrome>
 </div>

@@ -16,6 +16,7 @@
   import { css } from '$styled/css'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   interface Props {
     videoSrc?: string

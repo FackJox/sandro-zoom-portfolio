@@ -18,6 +18,7 @@
   import BorderedViewport from '../components/ui/BorderedViewport.svelte'
   import ContentSlab from '../components/ui/ContentSlab.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
+  import UIChrome from '../components/ui/UIChrome.svelte'
 
   // About beat data structure
   interface AboutBeat {
@@ -120,13 +121,6 @@
     backgroundColor: 'brand.bg',
   })
 
-  const labelContainerStyles = css({
-    position: 'absolute',
-    top: '8vh',
-    left: '8vw',
-    zIndex: '10',
-  })
-
   const gridStyles = css({
     display: 'grid',
     gridTemplateColumns: '0.6fr 0.4fr',
@@ -160,18 +154,9 @@
   })
 
   const barContainerStyles = css({
-    position: 'absolute',
-    bottom: '8vh',
-    left: '50%',
-    transform: 'translateX(-50%)',
     display: 'flex',
     alignItems: 'center',
     gap: '0.75rem',
-    zIndex: '10',
-
-    '@media (max-width: 767px)': {
-      bottom: '10vh',
-    },
   })
 
   const barStyles = css({
@@ -194,11 +179,6 @@
 </script>
 
 <div bind:this={containerEl} class={containerStyles} data-scene="about">
-  <!-- Section Label -->
-  <div class={labelContainerStyles}>
-    <SectionLabel text="ABOUT ME" />
-  </div>
-
   <!-- Two-Column Grid -->
   <div class={gridStyles}>
     <!-- Left: Bordered Viewport with Image -->
@@ -221,21 +201,27 @@
     </div>
   </div>
 
-  <!-- Bar Progress Indicators -->
-  <div class={barContainerStyles}>
-    {#each beats as beat, i}
-      <button
-        type="button"
-        class={barStyles}
-        style="width: {i === activeIndex ? '32px' : '12px'};"
-        data-active={i === activeIndex}
-        onclick={() => handleBarSelect(i)}
-        aria-label="View {beat.subtitle}"
-        aria-current={i === activeIndex ? 'step' : undefined}
-      ></button>
-    {/each}
-  </div>
+  <!-- UI Chrome - consistent positioning across all viewports -->
+  <UIChrome>
+    {#snippet topLeft()}
+      <SectionLabel text="ABOUT ME" />
+    {/snippet}
 
-  <!-- Scroll Hint -->
-  <ScrollHint />
+    {#snippet bottomCenter()}
+      <div class={barContainerStyles}>
+        {#each beats as beat, i}
+          <button
+            type="button"
+            class={barStyles}
+            style="width: {i === activeIndex ? '32px' : '12px'};"
+            data-active={i === activeIndex}
+            onclick={() => handleBarSelect(i)}
+            aria-label="View {beat.subtitle}"
+            aria-current={i === activeIndex ? 'step' : undefined}
+          ></button>
+        {/each}
+      </div>
+      <ScrollHint />
+    {/snippet}
+  </UIChrome>
 </div>
