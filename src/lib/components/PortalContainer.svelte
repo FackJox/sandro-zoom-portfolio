@@ -312,7 +312,8 @@
 
               onEnterBack: () => {
                 console.log(`[CardFlip ${i}->${i+1}] ENTER_BACK - mounting grid (reverse)`)
-                mountGrid(incoming, outgoing)
+                // Same mount order as forward - scroll direction reverses the animation
+                mountGrid(outgoing, incoming)
               },
 
               onLeave: () => {

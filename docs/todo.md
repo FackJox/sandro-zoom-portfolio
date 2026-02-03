@@ -1,8 +1,4 @@
 
-
-- egg roll on portal zoom outline? could be light like the grid transition.
-
-
 - film overview stack clickable
 - film overview stack thumbnails 
 - overview stack fit vertically in mobile / single column or scrollable? 
