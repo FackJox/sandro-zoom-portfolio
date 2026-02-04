@@ -93,7 +93,7 @@
   debug={true}
 >
   {#snippet chrome()}
-    <div class="nav-chrome">
+    <div class="nav-chrome" class:visible={!isLoading}>
       <NavMenu sections={navSections} />
     </div>
   {/snippet}
@@ -128,6 +128,15 @@
     position: absolute;
     top: clamp(24px, 5vh, 48px);
     right: clamp(16px, 5vw, 64px);
+    /* Match loader fade-out timing - hidden during loading */
+    opacity: 0;
+    transition: opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0);
+    pointer-events: none;
+  }
+
+  .nav-chrome.visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   @media (max-width: 767px) {
