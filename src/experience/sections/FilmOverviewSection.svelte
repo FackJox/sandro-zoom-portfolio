@@ -335,6 +335,17 @@
         }
       })
 
+      // Slightly dim other thumbnails to emphasize highlighted film
+      otherFrames.forEach(frame => {
+        tl.to(frame, {
+          autoAlpha: 0.45,
+          duration: STANDARD,
+          ease: 'ease-lock-on',
+          immediateRender: false,
+          overwrite: 'auto',
+        }, pos(PHASES.BORDER_FADE))
+      })
+
       // PHASE 2: Others exit with scale and fade
       otherFrames.forEach(frame => {
         tl.to(frame, {
