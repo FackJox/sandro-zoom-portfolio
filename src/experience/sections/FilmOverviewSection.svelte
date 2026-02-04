@@ -130,10 +130,9 @@
   /**
    * Navigate to a specific film's details view by scrolling to its focus phase.
    *
-   * With scrubbed ScrollTriggers (scrub: 1), there's a 1-second lag between
-   * scroll position and timeline position. To provide instant feedback:
-   * 1. Scroll instantly to the target position
-   * 2. Directly set the timeline progress to match (bypassing scrub delay)
+   * ROBUST PATTERN: Use GSAP to animate the scroll position smoothly.
+   * This allows the scrubbed ScrollTrigger to update properly as scroll changes,
+   * avoiding issues with instant jumps that can confuse overlapping animations.
    *
    * Target: Middle of "reading time" (between CONTENT_ENTER and CONTENT_EXIT)
    * This ensures all focus animations have completed and ContentSlab is visible.
@@ -159,18 +158,18 @@
 
     console.log(`[FilmOverview] NAVIGATE: to film ${index} details at scroll=${targetScroll.toFixed(0)}px (progress=${(targetProgress * 100).toFixed(1)}%)`)
 
-    // Scroll instantly to target position
-    window.scrollTo({ top: targetScroll, behavior: 'instant' })
-
-    // Directly set timeline progress to bypass scrub delay
-    // This provides instant visual feedback instead of waiting for scrub to catch up
-    if (filmScrollTrigger?.animation) {
-      filmScrollTrigger.animation.progress(targetProgress)
-    }
-
-    // Update activeIndex and phase immediately for UI consistency
+    // Update state immediately for UI consistency
     activeIndex = index
     phase = 'focus'
+
+    // Use GSAP to smoothly scroll to the target position
+    // This allows the scrubbed timeline to update properly as scroll changes
+    // Duration is short (0.5s) to feel responsive while being smooth enough for GSAP
+    gsap.to(window, {
+      scrollTo: { y: targetScroll, autoKill: false },
+      duration: 0.5,
+      ease: 'power2.out'
+    })
   }
 
   // DIAGNOSTIC: Log phase and activeIndex changes with video sources
@@ -837,7 +836,7 @@
         tabindex="0"
         aria-label="View {film.title}"
       >
-        <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
+        <BorderedViewport aspectRatio="16/9">
           <!-- Thumbnail Layer - visible in overview, crossfades out in focus -->
           <div class={thumbnailLayerStyles} data-thumbnail>
             {#if film.media.type === 'youtube'}
@@ -922,7 +921,7 @@
     <!-- Video Container - keyed by activeIndex to force video element recreation -->
     {#key activeIndex}
     <div class={focusVideoContainerStyles} data-focus-video>
-      <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
+      <BorderedViewport aspectRatio="16/9">
         <!-- Render current film's video content -->
         {#if currentFilm.media.type === 'youtube'}
           <iframe
