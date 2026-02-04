@@ -14,3 +14,11 @@ export { default as ContentSlab } from './ContentSlab.svelte'
 export { default as ScrollHint } from './ScrollHint.svelte'
 export { default as StepIndicator } from './StepIndicator.svelte'
 export { default as UIChrome } from './UIChrome.svelte'
+
+// Navigation
+export { default as NavMenu } from './NavMenu.svelte'
+export { default as NavMenuButton } from './NavMenuButton.svelte'
+export { default as NavMenuItem } from './NavMenuItem.svelte'
+
+// Social
+export { default as InstagramStrip } from './InstagramStrip.svelte'

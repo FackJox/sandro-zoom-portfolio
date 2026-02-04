@@ -2,7 +2,8 @@
   import { browser } from '$app/environment'
   import { registerGSAP } from '$lib/core/gsap'
   import { PortalContainer } from '$lib/components'
-  
+  import { NavMenu } from '$experience/components/ui'
+
   // Import section components
   import {
     HeroShowreelScene,
@@ -11,6 +12,15 @@
     ServicesSection,
     ContactSection
   } from '$experience/sections'
+
+  // Navigation sections config
+  const navSections = [
+    { id: 'showreel', label: 'SHOWREEL', sceneIndex: 0 },
+    { id: 'film', label: 'FILM', sceneIndex: 1 },
+    { id: 'about', label: 'ABOUT', sceneIndex: 2 },
+    { id: 'services', label: 'SERVICES', sceneIndex: 5 },
+    { id: 'contact', label: 'CONTACT', sceneIndex: 6 },
+  ]
 
   // Register GSAP immediately on client (before any components mount)
   if (browser) {
@@ -82,6 +92,12 @@
   markers={false}
   debug={true}
 >
+  {#snippet chrome()}
+    <div class="nav-chrome">
+      <NavMenu sections={navSections} />
+    </div>
+  {/snippet}
+
   <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
   <HeroShowreelScene onVideoReady={handleVideoReady} {entranceReady} {isLoading} />
 
@@ -106,3 +122,18 @@
   <!-- Scene 7: Contact -->
   <ContactSection />
 </PortalContainer>
+
+<style>
+  .nav-chrome {
+    position: absolute;
+    top: clamp(24px, 5vh, 48px);
+    right: clamp(16px, 5vw, 64px);
+  }
+
+  @media (max-width: 767px) {
+    .nav-chrome {
+      top: clamp(16px, 4vh, 32px);
+      right: clamp(12px, 4vw, 24px);
+    }
+  }
+</style>

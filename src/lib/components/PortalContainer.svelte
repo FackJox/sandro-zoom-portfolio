@@ -69,6 +69,8 @@
   import { getTransition, isCardFlipTransition, mountCardFlipGrid, prefersReducedMotion } from '../transitions'
   import type { CardFlipTransitionConfig, CardFlipGrid } from '../transitions'
 
+  import type { Snippet } from 'svelte'
+
   let {
     totalDuration,
     sceneDurations,
@@ -81,7 +83,8 @@
     markers = false,
     debug = false,
     children,
-  }: PortalContainerProps & { children: any } = $props()
+    chrome,
+  }: PortalContainerProps & { children: any; chrome?: Snippet } = $props()
 
   // ============================================================================
   // State
@@ -431,6 +434,18 @@
   >
     {@render children()}
   </div>
+
+  <!-- Persistent chrome layer (nav menu, etc.) -->
+  {#if chrome}
+    <div
+      data-portal-chrome
+      style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; pointer-events: none; z-index: 1000;"
+    >
+      <div style="pointer-events: auto;">
+        {@render chrome()}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>

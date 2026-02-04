@@ -131,6 +131,12 @@
     justifyContent: 'flex-end',
     gap: '0.75rem',
     pointerEvents: 'auto',
+
+    // Mobile: span full width for true centering
+    '@media (max-width: 767px)': {
+      gridColumn: '1 / -1', // Span all columns
+      justifySelf: 'center',
+    },
   })
 
   const bottomRightStyles = css({

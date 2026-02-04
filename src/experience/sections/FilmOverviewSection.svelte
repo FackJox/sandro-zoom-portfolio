@@ -107,6 +107,9 @@
   let activeIndex = $state(0)
   let phase = $state<'overview' | 'focus' | 'transition'>('overview')
 
+  // Store scroll range for click-to-navigate
+  let scrollRange = $state<{ start: number; end: number } | null>(null)
+
   // Derived state
   const currentFilm = $derived(films[activeIndex])
   const labelText = 'FILM'
@@ -122,6 +125,34 @@
   // Phase thresholds within each film's cycle (relative to FILM_RANGE)
   const PHASE_LAYOUT_SHIFT = 0.222
   const PHASE_LAYOUT_RESET = 0.667
+
+  /**
+   * Navigate to a specific film's details view by scrolling to its focus phase.
+   * Used by StepIndicator and film thumbnail clicks.
+   */
+  function navigateToFilm(index: number) {
+    if (!scrollRange || index < 0 || index >= films.length) return
+
+    // Calculate the scroll position for this film's focus/details phase
+    // Film cycle starts at: ACTIVE_START + (index * FILM_RANGE)
+    const filmCycleStart = ACTIVE_START + (index * FILM_RANGE)
+    // Target the middle of the focus phase (between LAYOUT_SHIFT and LAYOUT_RESET)
+    // Focus phase: 22.2% - 66.7% of film cycle, middle is ~44%
+    const focusMidpoint = (PHASE_LAYOUT_SHIFT + PHASE_LAYOUT_RESET) / 2
+    const targetProgress = filmCycleStart + (FILM_RANGE * focusMidpoint)
+
+    // Convert progress to absolute scroll position
+    const sectionScrollRange = scrollRange.end - scrollRange.start
+    const targetScroll = scrollRange.start + (targetProgress * sectionScrollRange)
+
+    console.log(`[FilmOverview] NAVIGATE: to film ${index} details at scroll=${targetScroll.toFixed(0)}px (progress=${(targetProgress * 100).toFixed(1)}%)`)
+
+    // Scroll to position and force ScrollTrigger update on completion
+    // Use instant scroll to avoid conflicts with scrubbed animation
+    window.scrollTo({ top: targetScroll, behavior: 'instant' })
+    // Force immediate ScrollTrigger update to sync animation state
+    ScrollTrigger.update()
+  }
 
   // DIAGNOSTIC: Log phase and activeIndex changes with video sources
   $effect(() => {
@@ -198,7 +229,7 @@
 
     // Initialize all elements - start with opacity 0 for fadeIn
     filmFrames.forEach((frame, i) => {
-      gsap.set(frame, { autoAlpha: 0, scale: 0.95, width: '100%' })
+      gsap.set(frame, { autoAlpha: 0, scale: 0.95, y: 0, x: 0 })
     })
 
     // Initialize focus layout (hidden initially, shown during focus state)
@@ -285,22 +316,12 @@
 
       // PHASE 2: Others exit with scale and fade
       otherFrames.forEach(frame => {
-        if (mobile) {
-          tl.to(frame, {
-            scale: 0.9,
-            y: -30,
-            autoAlpha: 0,
-            duration: CINEMATIC,
-            ease: 'ease-release',
-          }, pos(PHASES.OTHERS_EXIT))
-        } else {
-          tl.to(frame, {
-            scale: 0.85,
-            autoAlpha: 0,
-            duration: CINEMATIC,
-            ease: 'ease-release',
-          }, pos(PHASES.OTHERS_EXIT))
-        }
+        tl.to(frame, {
+          scale: 0.9,
+          autoAlpha: 0,
+          duration: CINEMATIC,
+          ease: 'ease-release',
+        }, pos(PHASES.OTHERS_EXIT))
       })
 
       // PHASE 4: Layout shift - transition from overview grid to focus layout
@@ -368,6 +389,8 @@
         tl.to(frame, {
           autoAlpha: 1,
           scale: 1,
+          y: 0,
+          x: 0,
           duration: CINEMATIC,
           ease: 'ease-lock-on',
         }, pos(PHASES.OTHERS_RETURN))
@@ -480,6 +503,9 @@
 
     console.log(`[FilmOverview] INIT: scrollRange=${sectionStart.toFixed(0)}px-${sectionEnd.toFixed(0)}px (${(sectionEnd - sectionStart).toFixed(0)}px)`)
 
+    // Store scroll range for click-to-navigate
+    scrollRange = { start: sectionStart, end: sectionEnd }
+
     const isMobileNow = typeof window !== 'undefined'
       && window.matchMedia('(max-width: 767px)').matches
 
@@ -487,11 +513,11 @@
       const tl = buildFilmTimeline(containerEl!, isMobileNow)
 
 
-      const scrollRange = sectionEnd - sectionStart
+      const scrollLength = sectionEnd - sectionStart
       const st = ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
-        end: `+=${scrollRange}`,
+        end: `+=${scrollLength}`,
         scrub: 1,
         invalidateOnRefresh: true,
         animation: tl,
@@ -550,6 +576,7 @@
   })
 
   // Overview grid styles - transforms during focus
+  // Mobile: Uses width-constrained cards so 16:9 aspect ratio fits viewport height
   const overviewGridStyles = css({
     position: 'absolute',
     inset: '0',
@@ -567,19 +594,32 @@
       padding: '12vh 6vw',
     },
 
-    // Mobile (<768px) - single column stack
+    // Mobile (<768px) - viewport-fit single column
+    // Cards sized to maximize space while fitting all 4 + UI chrome
     '@media (max-width: 767px)': {
       gridTemplateColumns: '1fr',
-      gap: '1rem',
-      padding: '14vh 4vw 16vh',
-      alignContent: 'start',
+      gap: '0.625rem', // 10px gaps × 3 = 30px total
+      // Padding: 72px top (label + breathing room) + 88px bottom (step indicator + breathing room)
+      padding: '72px 4vw 88px',
+      alignContent: 'center',
+      justifyItems: 'center',
     },
   })
 
   const filmFrameStyles = css({
     position: 'relative',
     width: '100%',
-    transformOrigin: 'left center',
+    transformOrigin: 'center center',
+    cursor: 'pointer',
+
+    // Mobile: constrain WIDTH so 16:9 aspect ratio fits viewport height
+    // Math: available_height = 100vh - 72px - 88px - 30px = 100vh - 190px
+    // Per card height = available / 4
+    // Width = height × (16/9) = (100vh - 190px) / 4 × 1.778
+    // Simplified: ≈ 44.4vh - 84px, capped at 92% viewport width
+    '@media (max-width: 767px)': {
+      width: 'min(92%, calc(44.4vh - 84px))',
+    },
   })
 
   // Layered media container - holds both thumbnail and video player
@@ -663,6 +703,11 @@
     flexDirection: 'column',
     gap: '0.125rem',
     zIndex: '10', // Above thumbnail and video layers
+
+    // Compact overlay for mobile
+    '@media (max-width: 767px)': {
+      padding: '0.875rem 0.75rem 0.625rem',
+    },
   })
 
   const filmTitleStyles = css({
@@ -720,13 +765,15 @@
       alignContent: 'center',
     },
 
-    // Mobile (<768px) - stacked with adjusted padding
+    // Mobile (<768px) - stacked, matching overview padding for smooth transitions
     '@media (max-width: 767px)': {
       gridTemplateColumns: '1fr',
       gridTemplateRows: 'auto auto',
-      gap: '1.5rem',
-      padding: '14vh 4vw 20vh',
+      gap: '1rem',
+      // Match overview padding exactly to prevent position shifts
+      padding: '72px 4vw 88px',
       alignContent: 'center',
+      overflow: 'auto',
     },
   })
 
@@ -752,6 +799,11 @@
         data-film={film.id}
         data-index={i}
         data-animate="slide"
+        onclick={() => navigateToFilm(i)}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToFilm(i) } }}
+        role="button"
+        tabindex="0"
+        aria-label="View {film.title}"
       >
         <BorderedViewport aspectRatio={isMobile ? '16/9' : '2.39/1'}>
           <!-- Thumbnail Layer - visible in overview, crossfades out in focus -->
@@ -906,6 +958,7 @@
         {steps}
         {activeIndex}
         showLabels={true}
+        onSelect={navigateToFilm}
       />
     {/snippet}
   </UIChrome>

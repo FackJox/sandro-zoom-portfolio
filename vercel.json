@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "git lfs install && git config lfs.url https://github.com/FackJox/sandro-zoom-portfolio.git/info/lfs && git lfs pull && npm install",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/instagram/refresh",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

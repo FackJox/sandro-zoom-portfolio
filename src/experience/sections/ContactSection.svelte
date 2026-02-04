@@ -16,6 +16,7 @@
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ContactBlock from '../components/ui/ContactBlock.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
+  import InstagramStrip from '../components/ui/InstagramStrip.svelte'
 
   interface Props {
     backgroundSrc?: string
@@ -166,6 +167,19 @@
     textAlign: 'center',
   })
 
+  // Instagram strip container - positioned at bottom, above footer
+  const instagramStripContainerStyles = css({
+    position: 'absolute',
+    bottom: '10vh',
+    left: '0',
+    right: '0',
+    zIndex: '10',
+
+    '@media (max-width: 767px)': {
+      bottom: '12vh',
+    },
+  })
+
   // Footer info
   const footerStyles = css({
     position: 'absolute',
@@ -211,6 +225,11 @@
   <!-- Contact Block (centered) -->
   <div class={contactContainerStyles}>
     <ContactBlock />
+  </div>
+
+  <!-- Instagram Feed Strip -->
+  <div class={instagramStripContainerStyles}>
+    <InstagramStrip />
   </div>
 
   <!-- UI Chrome - consistent positioning across all viewports -->

@@ -11,8 +11,14 @@ Add a horizontal scrolling Instagram feed strip to the contact/footer area of Sa
 | Location | Contact/footer area |
 | Display format | Horizontal scroll strip, 4-6 visible at a time |
 | Click behavior | Opens post directly on Instagram |
-| Data source | Instagram Basic Display API with auto-refresh |
+| Data source | Instagram API with Instagram Login (for Business/Creator accounts) |
 | Hosting | Existing Vercel project (free tier) |
+
+## API Note
+
+The Instagram Basic Display API was deprecated December 4, 2024. This implementation uses the **Instagram API with Instagram Login**, which requires a Business or Creator Instagram account (Sandro has a Creator account).
+
+Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
 
 ## Visual Treatment
 

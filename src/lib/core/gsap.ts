@@ -7,6 +7,7 @@
 
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin'
 import { CustomEase } from 'gsap/CustomEase'
 import { Flip } from 'gsap/dist/Flip'
 import { TextPlugin } from 'gsap/dist/TextPlugin'
@@ -29,6 +30,7 @@ export function registerGSAP(): void {
 
   gsap.registerPlugin(
     ScrollTrigger,
+    ScrollToPlugin,
     CustomEase,
     Flip,
     TextPlugin,
@@ -74,5 +76,5 @@ export function isGSAPRegistered(): boolean {
 }
 
 // Re-export GSAP and plugins for convenience
-export { gsap, ScrollTrigger, CustomEase, Flip, TextPlugin, Observer }
+export { gsap, ScrollTrigger, ScrollToPlugin, CustomEase, Flip, TextPlugin, Observer }
 // export { ScrollSmoother, SplitText, DrawSVGPlugin, MotionPathPlugin }

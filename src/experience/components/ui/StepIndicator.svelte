@@ -38,7 +38,17 @@
   const containerStyles = css({
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem',
+    justifyContent: 'center',
+    // Fluid gap that shrinks on smaller viewports
+    gap: 'clamp(0.5rem, 2vw, 1.5rem)',
+    // Ensure it fits within viewport
+    maxWidth: '100%',
+    flexWrap: 'wrap',
+
+    // On very narrow viewports, reduce gap further
+    '@media (max-width: 480px)': {
+      gap: '0.375rem',
+    },
   })
 
   const stepStyles = css({
@@ -50,6 +60,13 @@
     border: 'none',
     background: 'none',
     padding: '0.5rem',
+    // Flex shrink to fit
+    flexShrink: 0,
+
+    '@media (max-width: 480px)': {
+      gap: '0.375rem',
+      padding: '0.25rem',
+    },
   })
 
   const dotStyles = css({
@@ -63,19 +80,34 @@
       backgroundColor: 'brand.accent',
       transform: 'scale(1.25)',
     },
+
+    '@media (max-width: 480px)': {
+      width: '6px',
+      height: '6px',
+    },
   })
 
   const labelStyles = css({
     fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: '0.625rem',
-    letterSpacing: '0.1em',
+    // Fluid font size that scales with viewport
+    fontSize: 'clamp(0.5rem, 1.2vw, 0.625rem)',
+    letterSpacing: '0.08em',
     textTransform: 'uppercase',
     color: 'brand.phantom',
     whiteSpace: 'nowrap',
     transition: `color ${DURATION.micro}s`,
+    // Truncate if needed
+    maxWidth: 'clamp(60px, 15vw, 120px)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
 
     '&[data-active="true"]': {
       color: 'brand.textMuted',
+    },
+
+    // Hide labels on very narrow viewports
+    '@media (max-width: 400px)': {
+      display: 'none',
     },
   })
 </script>
