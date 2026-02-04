@@ -1,14 +1,13 @@
-- slightly dim the thumbnails not being highlighted
 
-- About and Overview timings and Services
 
 - performance, lazy load etc.
-- remove footer
+- buffering icon when loading - egg roll circle line spinner
 --
 
 - full screen and play controls on hero ?
 - gallery
 - gif snippets of the film -- ffmpeg for previews. 
+- remove footer
 
 - change pictures - sandro
 - social medias gallery

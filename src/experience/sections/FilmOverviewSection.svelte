@@ -19,7 +19,7 @@
 <script lang="ts">
   import { onMount, onDestroy, getContext } from 'svelte'
   import { css } from '$styled/css'
-  import { gsap, ScrollTrigger, Flip } from '$lib/core/gsap'
+  import { gsap, ScrollTrigger, Flip, ScrollToPlugin } from '$lib/core/gsap'
   import { DURATION } from '$lib/animation/easing'
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
@@ -252,10 +252,8 @@
       gsap.set(frame, { autoAlpha: 0, scale: 0.95, y: 0, x: 0 })
     })
 
-    // Initialize focus layout (hidden initially, shown during focus state)
-    if (focusLayout) {
-      gsap.set(focusLayout, { autoAlpha: 0, pointerEvents: 'none' })
-    }
+    // Focus layout visibility is now controlled by Svelte state (phase === 'focus')
+    // This avoids GSAP timeline issues with overlapping animations when jumping to positions
 
     // Initialize content slab within focus layout (offset for enter animation)
     if (contentSlab) {
@@ -370,15 +368,8 @@
         }, pos(PHASES.LAYOUT_SHIFT))
       })
 
-      // Fade in the focus layout (contains video + ContentSlab in grid)
-      if (focusLayout) {
-        tl.to(focusLayout, {
-          autoAlpha: 1,
-          pointerEvents: 'auto',
-          duration: CINEMATIC,
-          ease: 'ease-lock-on',
-        }, pos(PHASES.LAYOUT_SHIFT) + CINEMATIC * 0.3)
-      }
+      // Focus layout visibility is controlled by Svelte state (phase === 'focus')
+      // No GSAP animation needed - CSS transition handles the fade
 
       // PHASE 5: Content slab enters
       if (contentSlab) {
@@ -403,17 +394,7 @@
       }
 
       // PHASE 7: Layout reset - transition from focus layout back to overview grid
-      // Fade out focus layout and fade in all film frames
-
-      // Fade out the focus layout
-      if (focusLayout) {
-        tl.to(focusLayout, {
-          autoAlpha: 0,
-          pointerEvents: 'none',
-          duration: CINEMATIC,
-          ease: 'ease-release',
-        }, pos(PHASES.LAYOUT_RESET))
-      }
+      // Focus layout fade-out is handled by Svelte state (phase !== 'focus')
 
       // Fade in all film frames (overview thumbnails)
       filmFrames.forEach((frame, i) => {
@@ -766,6 +747,8 @@
   })
 
   // Focus layout grid - 60/40 split on desktop, stacked on tablet/mobile
+  // NOTE: Visibility is controlled by Svelte state (phase === 'focus') instead of GSAP
+  // because GSAP scrubbed timelines don't handle overlapping animations correctly when jumping
   const focusLayoutStyles = css({
     position: 'absolute',
     inset: '0',
@@ -774,9 +757,11 @@
     gap: '2rem',
     padding: '12vh 8vw',
     alignItems: 'center',
-    opacity: '0',
-    visibility: 'hidden',
-    pointerEvents: 'none',
+    // Solid background to cover the overview grid thumbnails beneath
+    backgroundColor: 'brand.bg',
+    // Visibility controlled by inline style based on phase state
+    // Use CSS transition for smooth fade
+    transition: 'opacity 0.35s ease-out, visibility 0.35s ease-out',
     zIndex: '20',
     overflow: 'visible', // Ensure content doesn't get clipped
 
@@ -917,7 +902,12 @@
   </div>
 
   <!-- Focus Layout Grid (appears during focus state) -->
-  <div class={focusLayoutStyles} data-focus-layout>
+  <!-- Visibility controlled by Svelte state, not GSAP, for reliable click navigation -->
+  <div
+    class={focusLayoutStyles}
+    data-focus-layout
+    style="opacity: {phase === 'focus' ? 1 : 0}; visibility: {phase === 'focus' ? 'visible' : 'hidden'}; pointer-events: {phase === 'focus' ? 'auto' : 'none'};"
+  >
     <!-- Video Container - keyed by activeIndex to force video element recreation -->
     {#key activeIndex}
     <div class={focusVideoContainerStyles} data-focus-video>
