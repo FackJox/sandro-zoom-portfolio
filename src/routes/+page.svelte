@@ -87,7 +87,7 @@
 </svelte:head>
 
 <PortalContainer
-  sceneDurations={[16, 36, 8, 8, 8, 16, 16]}
+  sceneDurations={[16, 36, 8, 8, 8, 12, 12]}
   scrollSpeed={65}
   markers={false}
   debug={true}
