@@ -171,17 +171,27 @@
     '&:focus-visible': {
       opacity: '1',
       backgroundColor: 'rgba(15, 23, 26, 0.4)',
-      outline: '2px solid',
-      outlineColor: 'brand.accent',
-      outlineOffset: '-2px',
+      outline: 'none',
     },
   })
 
-  const playIconStyles = css({
+  // Egg roll play button container
+  const eggRollContainerStyles = css({
+    position: 'relative',
     width: '64px',
     height: '64px',
-    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
+  })
+
+  // Play triangle inside egg roll
+  const playIconStyles = css({
+    width: '24px',
+    height: '24px',
+    marginLeft: '3px',
+    color: 'brand.accent',
   })
 </script>
 
@@ -256,7 +266,7 @@
   <!-- Loading spinner overlay -->
   <VideoLoadingSpinner visible={showSpinner} />
 
-  <!-- Play button overlay for requesting full video -->
+  <!-- Play button overlay for requesting full video - egg roll style -->
   {#if mode === 'preview' && hasFullVideo}
     <button
       class={playButtonStyles}
@@ -264,9 +274,15 @@
       aria-label="Play full video"
       type="button"
     >
-      <svg class={playIconStyles} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M8 5v14l11-7z"/>
-      </svg>
+      <div class={eggRollContainerStyles}>
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
+          <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
+          <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
+        </svg>
+        <svg class={playIconStyles} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </div>
     </button>
   {/if}
 </div>

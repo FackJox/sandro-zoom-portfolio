@@ -147,15 +147,24 @@
   // Playback mode state - tracks which films are showing full video vs preview
   let filmPlaybackMode = $state<('preview' | 'full')[]>(films.map(() => 'preview'))
 
+  // YouTube embed visibility state - tracks which films with youtubeEmbed are showing the embed
+  let youtubeEmbedVisible = $state<boolean[]>(films.map(() => false))
+
   // Handler for full video requests from VideoThumbnail
   function handleRequestFullVideo(index: number) {
     filmPlaybackMode[index] = 'full'
+  }
+
+  // Handler for YouTube embed play requests
+  function handleShowYoutubeEmbed(index: number) {
+    youtubeEmbedVisible[index] = true
   }
 
   // Reset to preview mode when returning to overview state
   $effect(() => {
     if (phase === 'overview') {
       filmPlaybackMode = films.map(() => 'preview')
+      youtubeEmbedVisible = films.map(() => false)
     }
   })
 
@@ -745,6 +754,42 @@
     height: '100%',
   })
 
+  // Egg roll play button styles - used in focus mode for Netflix/Redbull
+  const focusPlayButtonStyles = css({
+    position: 'absolute',
+    inset: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    opacity: '0',
+    transition: 'opacity 175ms, background-color 175ms',
+    zIndex: '20',
+    '&:hover': {
+      opacity: '1',
+      backgroundColor: 'rgba(15, 23, 26, 0.4)',
+    },
+  })
+
+  const eggRollContainerStyles = css({
+    position: 'relative',
+    width: '64px',
+    height: '64px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
+  })
+
+  const eggRollTriangleStyles = css({
+    width: '24px',
+    height: '24px',
+    marginLeft: '3px',
+    color: 'brand.accent',
+  })
+
   const overlayStyles = css({
     position: 'absolute',
     bottom: '0',
@@ -941,14 +986,41 @@
         {:else if currentFilm.media.type === 'video'}
           <!-- Video type with special handling for YouTube embed or external link -->
           {#if currentFilm.media.youtubeEmbed}
-            <!-- YouTube embed in focus mode (Netflix) -->
-            <iframe
-              src={currentFilm.media.youtubeEmbed}
-              title={currentFilm.title}
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen
-            ></iframe>
+            <!-- YouTube embed in focus mode (Netflix) - poster first, then embed -->
+            {#if youtubeEmbedVisible[activeIndex]}
+              <iframe
+                src={currentFilm.media.youtubeEmbed + '?autoplay=1'}
+                title={currentFilm.title}
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            {:else}
+              <VideoThumbnail
+                poster={currentFilm.media.poster}
+                previewSrc={currentFilm.media.previewSrc}
+                previewSrcWebm={currentFilm.media.previewSrcWebm}
+                previewSrcHevc={currentFilm.media.previewSrcHevc}
+                alt={currentFilm.title}
+                mode="preview"
+              />
+              <button
+                class={focusPlayButtonStyles}
+                onclick={() => handleShowYoutubeEmbed(activeIndex)}
+                aria-label="Play video"
+                type="button"
+              >
+                <div class={eggRollContainerStyles}>
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
+                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
+                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
+                  </svg>
+                  <svg class={eggRollTriangleStyles} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </div>
+              </button>
+            {/if}
           {:else if currentFilm.media.externalLink}
             <!-- External link wrapper in focus mode (Redbull) -->
             <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
@@ -960,6 +1032,17 @@
                 alt={currentFilm.title}
                 mode="preview"
               />
+              <div class={focusPlayButtonStyles} style="pointer-events: none;">
+                <div class={eggRollContainerStyles}>
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
+                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
+                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
+                  </svg>
+                  <svg class={eggRollTriangleStyles} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </div>
+              </div>
             </a>
           {:else}
             <!-- Standard video with play button for full video -->
