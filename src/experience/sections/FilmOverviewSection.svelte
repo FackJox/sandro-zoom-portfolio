@@ -27,6 +27,7 @@
   import ContentSlab from '../components/ui/ContentSlab.svelte'
   import StepIndicator from '../components/ui/StepIndicator.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
+  import VideoThumbnail from '../components/ui/VideoThumbnail.svelte'
 
   // Get portal context for scene durations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -40,9 +41,15 @@
     description: string
     media: {
       type: 'youtube' | 'video' | 'image'
+      // Full video sources (streamed on demand)
       src: string
       srcWebm?: string    // AV1/WebM optimized version
       srcHevc?: string    // HEVC/MP4 optimized version
+      // Preview clip sources (auto-preloaded for thumbnails)
+      previewSrc?: string
+      previewSrcWebm?: string
+      previewSrcHevc?: string
+      // Poster image (first frame, immediate load)
       poster?: string
       externalLink?: string
     }
@@ -80,9 +87,16 @@
       description: 'I directed, shot and edited the story of Grace, a recovering climber searching for a bigger life. Focusing on mental health and community the film was supported by Montane and played at film festivals world wide.',
       media: {
         type: 'video',
+        // Full videos (streamed on demand)
         src: '/videos/grace.mp4',
         srcWebm: '/videos/grace.av1.webm',
-        srcHevc: '/videos/grace.hevc.mp4'
+        srcHevc: '/videos/grace.hevc.mp4',
+        // Preview clips (auto-preloaded)
+        previewSrc: '/videos/grace-preview.mp4',
+        previewSrcWebm: '/videos/grace-preview.av1.webm',
+        previewSrcHevc: '/videos/grace-preview.hevc.mp4',
+        // Poster (immediate)
+        poster: '/videos/grace-poster.webp'
       }
     },
     {
@@ -93,9 +107,16 @@
       description: 'Filmed during one of six trips to Afghanistan this commercial for Charles Schwab bank depicts preparation for our record breaking expedition to Mt Noshaq, the countries highest peak at 7,495m.',
       media: {
         type: 'video',
+        // Full videos (streamed on demand)
         src: '/videos/shwab.mp4',
         srcWebm: '/videos/shwab.av1.webm',
-        srcHevc: '/videos/shwab.hevc.mp4'
+        srcHevc: '/videos/shwab.hevc.mp4',
+        // Preview clips (auto-preloaded)
+        previewSrc: '/videos/shwab-preview.mp4',
+        previewSrcWebm: '/videos/shwab-preview.av1.webm',
+        previewSrcHevc: '/videos/shwab-preview.hevc.mp4',
+        // Poster (immediate)
+        poster: '/videos/shwab-poster.webp'
       }
     },
   ]
@@ -110,6 +131,21 @@
   // Store scroll range and ScrollTrigger reference for click-to-navigate
   let scrollRange = $state<{ start: number; end: number } | null>(null)
   let filmScrollTrigger: ScrollTrigger | null = null
+
+  // Playback mode state - tracks which films are showing full video vs preview
+  let filmPlaybackMode = $state<('preview' | 'full')[]>(films.map(() => 'preview'))
+
+  // Handler for full video requests from VideoThumbnail
+  function handleRequestFullVideo(index: number) {
+    filmPlaybackMode[index] = 'full'
+  }
+
+  // Reset to preview mode when returning to overview state
+  $effect(() => {
+    if (phase === 'overview') {
+      filmPlaybackMode = films.map(() => 'preview')
+    }
+  })
 
   // Derived state
   const currentFilm = $derived(films[activeIndex])
@@ -822,61 +858,30 @@
         aria-label="View {film.title}"
       >
         <BorderedViewport aspectRatio="16/9">
-          <!-- Thumbnail Layer - visible in overview, crossfades out in focus -->
+          <!-- Thumbnail Layer - uses VideoThumbnail for smart loading (video types) -->
           <div class={thumbnailLayerStyles} data-thumbnail>
             {#if film.media.type === 'youtube'}
+              <!-- YouTube: Use YT thumbnail, no preview/full video logic -->
               <img
-                src={`https://img.youtube.com/vi/${film.media.src.split('/').pop()}/maxresdefault.jpg`}
+                src={film.media.poster || `https://img.youtube.com/vi/${film.media.src.split('/').pop()}/maxresdefault.jpg`}
                 alt={film.title}
               />
             {:else if film.media.type === 'video'}
-              <video
-                autoplay
-                loop
-                muted
-                playsinline
-                preload="auto"
-              >
-                {#if film.media.srcWebm}
-                  <source src={film.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
-                {/if}
-                {#if film.media.srcHevc}
-                  <source src={film.media.srcHevc} type="video/mp4; codecs=hvc1" />
-                {/if}
-                <source src={film.media.src} type="video/mp4" />
-              </video>
+              <!-- Local video: Use VideoThumbnail with poster → preview → full -->
+              <VideoThumbnail
+                poster={film.media.poster}
+                previewSrc={film.media.previewSrc}
+                previewSrcWebm={film.media.previewSrcWebm}
+                previewSrcHevc={film.media.previewSrcHevc}
+                fullSrc={film.media.src}
+                fullSrcWebm={film.media.srcWebm}
+                fullSrcHevc={film.media.srcHevc}
+                alt={film.title}
+                mode={filmPlaybackMode[i]}
+                onRequestFullVideo={() => handleRequestFullVideo(i)}
+              />
             {:else if film.media.type === 'image'}
-              <img src={film.media.src} alt={film.title} />
-            {/if}
-          </div>
-
-          <!-- Video Player Layer - hidden initially, crossfades in during focus -->
-          <div class={videoPlayerLayerStyles} data-video-player>
-            {#if film.media.type === 'youtube'}
-              <iframe
-                src={film.media.src}
-                title={film.title}
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-              ></iframe>
-            {:else if film.media.type === 'video'}
-              <video
-                autoplay
-                loop
-                muted
-                playsinline
-                preload="auto"
-              >
-                {#if film.media.srcWebm}
-                  <source src={film.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
-                {/if}
-                {#if film.media.srcHevc}
-                  <source src={film.media.srcHevc} type="video/mp4; codecs=hvc1" />
-                {/if}
-                <source src={film.media.src} type="video/mp4" />
-              </video>
-            {:else if film.media.type === 'image'}
+              <!-- Image with optional external link -->
               {#if film.media.externalLink}
                 <a href={film.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
                   <img src={film.media.src} alt={film.title} />
@@ -912,7 +917,7 @@
     {#key activeIndex}
     <div class={focusVideoContainerStyles} data-focus-video>
       <BorderedViewport aspectRatio="16/9">
-        <!-- Render current film's video content -->
+        <!-- Render current film's video content (focus state) -->
         {#if currentFilm.media.type === 'youtube'}
           <iframe
             src={currentFilm.media.src}
@@ -922,21 +927,19 @@
             allowfullscreen
           ></iframe>
         {:else if currentFilm.media.type === 'video'}
-          <video
-            autoplay
-            loop
-            muted
-            playsinline
-            preload="auto"
-          >
-            {#if currentFilm.media.srcWebm}
-              <source src={currentFilm.media.srcWebm} type="video/webm; codecs=av01.0.08M.08" />
-            {/if}
-            {#if currentFilm.media.srcHevc}
-              <source src={currentFilm.media.srcHevc} type="video/mp4; codecs=hvc1" />
-            {/if}
-            <source src={currentFilm.media.src} type="video/mp4" />
-          </video>
+          <!-- In focus state, use VideoThumbnail with current playback mode -->
+          <VideoThumbnail
+            poster={currentFilm.media.poster}
+            previewSrc={currentFilm.media.previewSrc}
+            previewSrcWebm={currentFilm.media.previewSrcWebm}
+            previewSrcHevc={currentFilm.media.previewSrcHevc}
+            fullSrc={currentFilm.media.src}
+            fullSrcWebm={currentFilm.media.srcWebm}
+            fullSrcHevc={currentFilm.media.srcHevc}
+            alt={currentFilm.title}
+            mode={filmPlaybackMode[activeIndex]}
+            onRequestFullVideo={() => handleRequestFullVideo(activeIndex)}
+          />
         {:else if currentFilm.media.type === 'image'}
           {#if currentFilm.media.externalLink}
             <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>

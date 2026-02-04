@@ -417,16 +417,19 @@
   ></div>
 
   <!-- Video Background (filter animates based on scroll) -->
+  <!-- Poster provides seamless initial display while video preloads -->
   <video
     bind:this={videoEl}
     class={videoStyles}
     style:filter={videoFilter}
     src={videoSrc}
+    poster="/videos/showreel-poster.webp"
     autoplay
     loop
     muted
     playsinline
     disablepictureinpicture
+    preload="auto"
   ></video>
 
   <!-- Hero Overlay (fades out during transition) -->
