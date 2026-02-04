@@ -51,7 +51,10 @@
       previewSrcHevc?: string
       // Poster image (first frame, immediate load)
       poster?: string
+      // External link - opens in new tab when clicked in focus mode
       externalLink?: string
+      // YouTube embed URL - shown in focus mode instead of video player
+      youtubeEmbed?: string
     }
   }
 
@@ -63,8 +66,13 @@
       year: '2021',
       description: "I worked as lead cinematographer on Netflix's smash hit 14 Peaks. I shot most of the drone footage along with key scenes including the intro, Nims visiting his family and the K2 drama. I then worked as DOP on the first successful K2 winter expedition.",
       media: {
-        type: 'youtube',
-        src: 'https://www.youtube.com/embed/8QH5hBOoz08'
+        type: 'video',
+        src: '', // No full video - YouTube embed shown in focus mode
+        poster: '/videos/netflix-poster.webp',
+        previewSrc: '/videos/netflix-preview.mp4',
+        previewSrcWebm: '/videos/netflix-preview.av1.webm',
+        previewSrcHevc: '/videos/netflix-preview.hevc.mp4',
+        youtubeEmbed: 'https://www.youtube.com/embed/8QH5hBOoz08'
       }
     },
     {
@@ -74,8 +82,12 @@
       year: '2022',
       description: "In 2022 I filmed episode 1 of Sasha DiGiulian's 'No Days Off' series for RedBull TV. During preparation for Petzl's RocTrip Sasha, Alex Megos, Steve McClure & Neil Gresham developed new routes in a remote and undeveloped corner of Greece's mainland.",
       media: {
-        type: 'image',
-        src: 'https://static.wixstatic.com/media/37d07c_5ed3218453264242ab5e39b7c013c723~mv2.jpg',
+        type: 'video',
+        src: '', // No full video - external link shown in focus mode
+        poster: '/videos/redbull-poster.webp',
+        previewSrc: '/videos/redbull-preview.mp4',
+        previewSrcWebm: '/videos/redbull-preview.av1.webm',
+        previewSrcHevc: '/videos/redbull-preview.hevc.mp4',
         externalLink: 'https://www.redbull.com/us-en/episodes/no-days-off-s1-e1'
       }
     },
@@ -927,19 +939,43 @@
             allowfullscreen
           ></iframe>
         {:else if currentFilm.media.type === 'video'}
-          <!-- In focus state, use VideoThumbnail with current playback mode -->
-          <VideoThumbnail
-            poster={currentFilm.media.poster}
-            previewSrc={currentFilm.media.previewSrc}
-            previewSrcWebm={currentFilm.media.previewSrcWebm}
-            previewSrcHevc={currentFilm.media.previewSrcHevc}
-            fullSrc={currentFilm.media.src}
-            fullSrcWebm={currentFilm.media.srcWebm}
-            fullSrcHevc={currentFilm.media.srcHevc}
-            alt={currentFilm.title}
-            mode={filmPlaybackMode[activeIndex]}
-            onRequestFullVideo={() => handleRequestFullVideo(activeIndex)}
-          />
+          <!-- Video type with special handling for YouTube embed or external link -->
+          {#if currentFilm.media.youtubeEmbed}
+            <!-- YouTube embed in focus mode (Netflix) -->
+            <iframe
+              src={currentFilm.media.youtubeEmbed}
+              title={currentFilm.title}
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          {:else if currentFilm.media.externalLink}
+            <!-- External link wrapper in focus mode (Redbull) -->
+            <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
+              <VideoThumbnail
+                poster={currentFilm.media.poster}
+                previewSrc={currentFilm.media.previewSrc}
+                previewSrcWebm={currentFilm.media.previewSrcWebm}
+                previewSrcHevc={currentFilm.media.previewSrcHevc}
+                alt={currentFilm.title}
+                mode="preview"
+              />
+            </a>
+          {:else}
+            <!-- Standard video with play button for full video -->
+            <VideoThumbnail
+              poster={currentFilm.media.poster}
+              previewSrc={currentFilm.media.previewSrc}
+              previewSrcWebm={currentFilm.media.previewSrcWebm}
+              previewSrcHevc={currentFilm.media.previewSrcHevc}
+              fullSrc={currentFilm.media.src}
+              fullSrcWebm={currentFilm.media.srcWebm}
+              fullSrcHevc={currentFilm.media.srcHevc}
+              alt={currentFilm.title}
+              mode={filmPlaybackMode[activeIndex]}
+              onRequestFullVideo={() => handleRequestFullVideo(activeIndex)}
+            />
+          {/if}
         {:else if currentFilm.media.type === 'image'}
           {#if currentFilm.media.externalLink}
             <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
