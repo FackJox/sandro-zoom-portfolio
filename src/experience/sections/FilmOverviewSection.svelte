@@ -107,8 +107,9 @@
   let activeIndex = $state(0)
   let phase = $state<'overview' | 'focus' | 'transition'>('overview')
 
-  // Store scroll range for click-to-navigate
+  // Store scroll range and ScrollTrigger reference for click-to-navigate
   let scrollRange = $state<{ start: number; end: number } | null>(null)
+  let filmScrollTrigger: ScrollTrigger | null = null
 
   // Derived state
   const currentFilm = $derived(films[activeIndex])
@@ -128,7 +129,14 @@
 
   /**
    * Navigate to a specific film's details view by scrolling to its focus phase.
-   * Used by StepIndicator and film thumbnail clicks.
+   *
+   * With scrubbed ScrollTriggers (scrub: 1), there's a 1-second lag between
+   * scroll position and timeline position. To provide instant feedback:
+   * 1. Scroll instantly to the target position
+   * 2. Directly set the timeline progress to match (bypassing scrub delay)
+   *
+   * Target: Middle of "reading time" (between CONTENT_ENTER and CONTENT_EXIT)
+   * This ensures all focus animations have completed and ContentSlab is visible.
    */
   function navigateToFilm(index: number) {
     if (!scrollRange || index < 0 || index >= films.length) return
@@ -136,10 +144,14 @@
     // Calculate the scroll position for this film's focus/details phase
     // Film cycle starts at: ACTIVE_START + (index * FILM_RANGE)
     const filmCycleStart = ACTIVE_START + (index * FILM_RANGE)
-    // Target the middle of the focus phase (between LAYOUT_SHIFT and LAYOUT_RESET)
-    // Focus phase: 22.2% - 66.7% of film cycle, middle is ~44%
-    const focusMidpoint = (PHASE_LAYOUT_SHIFT + PHASE_LAYOUT_RESET) / 2
-    const targetProgress = filmCycleStart + (FILM_RANGE * focusMidpoint)
+
+    // Target the middle of "reading time" - when ContentSlab is fully visible
+    // CONTENT_ENTER = 0.289, CONTENT_EXIT = 0.622
+    // Middle = (0.289 + 0.622) / 2 = 0.4555
+    const CONTENT_ENTER = 0.289
+    const CONTENT_EXIT = 0.622
+    const readingTimeMidpoint = (CONTENT_ENTER + CONTENT_EXIT) / 2
+    const targetProgress = filmCycleStart + (FILM_RANGE * readingTimeMidpoint)
 
     // Convert progress to absolute scroll position
     const sectionScrollRange = scrollRange.end - scrollRange.start
@@ -147,11 +159,18 @@
 
     console.log(`[FilmOverview] NAVIGATE: to film ${index} details at scroll=${targetScroll.toFixed(0)}px (progress=${(targetProgress * 100).toFixed(1)}%)`)
 
-    // Scroll to position and force ScrollTrigger update on completion
-    // Use instant scroll to avoid conflicts with scrubbed animation
+    // Scroll instantly to target position
     window.scrollTo({ top: targetScroll, behavior: 'instant' })
-    // Force immediate ScrollTrigger update to sync animation state
-    ScrollTrigger.update()
+
+    // Directly set timeline progress to bypass scrub delay
+    // This provides instant visual feedback instead of waiting for scrub to catch up
+    if (filmScrollTrigger?.animation) {
+      filmScrollTrigger.animation.progress(targetProgress)
+    }
+
+    // Update activeIndex and phase immediately for UI consistency
+    activeIndex = index
+    phase = 'focus'
   }
 
   // DIAGNOSTIC: Log phase and activeIndex changes with video sources
@@ -179,6 +198,8 @@
 
   // Cleanup
   onDestroy(() => {
+    filmScrollTrigger?.kill()
+    filmScrollTrigger = null
     ctx?.revert()
   })
 
@@ -514,7 +535,7 @@
 
 
       const scrollLength = sectionEnd - sectionStart
-      const st = ScrollTrigger.create({
+      filmScrollTrigger = ScrollTrigger.create({
         trigger: portalContainer,
         start: `top+=${sectionStart} top`,
         end: `+=${scrollLength}`,

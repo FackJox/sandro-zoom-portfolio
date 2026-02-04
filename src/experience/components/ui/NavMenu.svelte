@@ -14,7 +14,7 @@
   import { onMount, onDestroy, getContext } from 'svelte'
   import { browser } from '$app/environment'
   import { css } from '$styled/css'
-  import { gsap } from '$lib/core/gsap'
+  import { gsap, ScrollTrigger } from '$lib/core/gsap'
   import NavMenuButton from './NavMenuButton.svelte'
   import NavMenuItem from './NavMenuItem.svelte'
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
@@ -40,6 +40,7 @@
   let menuEl: HTMLElement | null = $state(null)
   let panelEl: HTMLElement | null = $state(null)
   let backdropEl: HTMLElement | null = $state(null)
+  let itemsContainerEl: HTMLElement | null = $state(null)
   let ctx: gsap.Context | null = null
 
   // Calculate current section from scroll position
@@ -66,21 +67,26 @@
     }
   }
 
-  // Scroll to a specific scene
+  // Scroll to a specific scene - lands AFTER transition completes
+  // Uses instant scroll to avoid conflicts with scrubbed ScrollTriggers
   function scrollToScene(sceneIndex: number): void {
     if (!portalConfig) return
 
-    const { startTimes, scrollSpeed } = portalConfig
-    const targetScroll = startTimes[sceneIndex] * scrollSpeed
+    const { startTimes, durations, scrollSpeed } = portalConfig
+    const sceneDuration = durations[sceneIndex] || 1
+
+    // Add 10% of scene duration to skip past the portal transition buffer
+    // This ensures we land when the scene is fully visible, not mid-transition
+    const TRANSITION_BUFFER = 0.10
+    const bufferOffset = sceneDuration * TRANSITION_BUFFER * scrollSpeed
+    const targetScroll = (startTimes[sceneIndex] * scrollSpeed) + bufferOffset
 
     closeMenu()
 
     setTimeout(() => {
-      gsap.to(window, {
-        scrollTo: { y: targetScroll, autoKill: false },
-        duration: 0.8,
-        ease: 'ease-lock-on',
-      })
+      // Scroll instantly - scrubbed ScrollTriggers will animate to match
+      // This avoids conflicts between scroll animation and scrub animation
+      window.scrollTo({ top: targetScroll, behavior: 'instant' })
     }, 150)
   }
 
@@ -88,12 +94,14 @@
     scrollToScene(section.sceneIndex)
   }
 
-  // Open menu - slide down from top
+  // Open menu - stagger items from alternating left/right
   function openMenu(): void {
-    if (isOpen || !panelEl || !backdropEl) return
+    if (isOpen || !panelEl || !backdropEl || !itemsContainerEl) return
 
     isOpen = true
     updateCurrentSection()
+
+    const items = itemsContainerEl.querySelectorAll('.nav-item')
 
     ctx = gsap.context(() => {
       const tl = gsap.timeline()
@@ -105,32 +113,48 @@
         ease: 'ease-lock-on',
       }, 0)
 
-      // Panel slides down from top
-      tl.fromTo(panelEl,
-        { y: '-100%', autoAlpha: 1 },
-        { y: '0%', duration: 0.35, ease: 'ease-lock-on' },
-        0
-      )
+      // Show panel immediately (it's transparent anyway)
+      tl.set(panelEl, { autoAlpha: 1 }, 0)
+
+      // Stagger items from alternating directions
+      items.forEach((item, i) => {
+        const fromLeft = i % 2 === 0 // 0, 2, 4 from left; 1, 3 from right
+        const xStart = fromLeft ? -120 : 120
+
+        tl.fromTo(item,
+          { x: xStart, autoAlpha: 0 },
+          { x: 0, autoAlpha: 1, duration: 0.3, ease: 'ease-lock-on' },
+          0.05 + (i * 0.06) // Stagger
+        )
+      })
 
     }, menuEl)
   }
 
-  // Close menu - slide up
+  // Close menu - items slide out to alternating directions
   function closeMenu(): void {
-    if (!isOpen || !panelEl || !backdropEl) return
+    if (!isOpen || !panelEl || !backdropEl || !itemsContainerEl) return
 
     isOpen = false
+
+    const items = itemsContainerEl.querySelectorAll('.nav-item')
 
     ctx?.revert()
     ctx = gsap.context(() => {
       const tl = gsap.timeline()
 
-      // Panel slides up
-      tl.to(panelEl, {
-        y: '-100%',
-        duration: 0.25,
-        ease: 'ease-release',
-      }, 0)
+      // Items slide out (reverse order, back to original directions)
+      const itemsArray = Array.from(items).reverse()
+      itemsArray.forEach((item, i) => {
+        const originalIndex = items.length - 1 - i
+        const toLeft = originalIndex % 2 === 0
+        const xEnd = toLeft ? -120 : 120
+
+        tl.to(item,
+          { x: xEnd, autoAlpha: 0, duration: 0.2, ease: 'ease-release' },
+          i * 0.04
+        )
+      })
 
       // Backdrop fades out
       tl.to(backdropEl, {
@@ -138,6 +162,9 @@
         duration: 0.2,
         ease: 'ease-release',
       }, 0.1)
+
+      // Hide panel at end
+      tl.set(panelEl, { autoAlpha: 0 })
 
     }, menuEl)
   }
@@ -181,9 +208,15 @@
     window.addEventListener('scroll', handleScroll, { passive: true })
     lastScrollY = window.scrollY
 
-    // Initial hidden state
-    if (panelEl) gsap.set(panelEl, { y: '-100%', autoAlpha: 1 })
+    // Initial hidden state - panel hidden, items will animate in
+    if (panelEl) gsap.set(panelEl, { autoAlpha: 0 })
     if (backdropEl) gsap.set(backdropEl, { autoAlpha: 0 })
+
+    // Hide all items initially
+    if (itemsContainerEl) {
+      const items = itemsContainerEl.querySelectorAll('.nav-item')
+      gsap.set(items, { autoAlpha: 0 })
+    }
   })
 
   onDestroy(() => {
@@ -259,7 +292,7 @@
     role="navigation"
     aria-label="Section navigation"
   >
-    <div class={itemsContainerStyles}>
+    <div class={itemsContainerStyles} bind:this={itemsContainerEl}>
       {#each sections as section, i}
         <NavMenuItem
           label={section.label}
