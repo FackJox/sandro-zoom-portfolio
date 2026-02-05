@@ -23,6 +23,7 @@
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
+  import VideoLoadingSpinner from '../components/ui/VideoLoadingSpinner.svelte'
 
   // Get portal context for scene durations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -120,30 +121,18 @@
   })
 
   // Initialize hidden states via GSAP on mount
-  // This ensures GSAP has full control from the start
+  // Set initial hidden state for supporting elements (NOT logo - it stays visible during loading)
   $effect(() => {
-    if (!supportingTextEl || !logosEl || !logoEl) return
+    if (!supportingTextEl || !logosEl) return
 
-    // Set initial hidden state - GSAP controls everything
+    // Set initial hidden state - GSAP controls everything EXCEPT logo
+    // Logo stays visible for branded loading experience
     gsap.set([supportingTextEl, logosEl], { autoAlpha: 0 })
-    gsap.set(logoEl, { autoAlpha: 0 })
   })
 
-  // Logo fade-in once layout is stable
-  // Brand Physics: ease-lock-on, brand-standard duration
-  $effect(() => {
-    if (!logoEl) return
-
-    const easeLockOn = 'cubic-bezier(0.19, 1.0, 0.22, 1.0)'
-
-    // Small delay for layout to stabilize, then fade in
-    gsap.to(logoEl, {
-      autoAlpha: 1,
-      duration: 0.315, // brand-standard (280-350ms)
-      ease: easeLockOn,
-      delay: 0.1 // Wait for layout
-    })
-  })
+  // Logo is now visible by default (no fade-in needed)
+  // It shows immediately during loading for branded loader experience
+  // The entrance animation for other elements still runs when entranceReady becomes true
 
   // Entrance animation effect
   // Robust pattern: single timeline with built-in delays for loader coordination
@@ -277,6 +266,22 @@
     zIndex: '150',
     transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
     pointerEvents: 'none',
+    // Flex layout to position spinner below logo area
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+
+  // Spinner container - positioned below the logo
+  // Needs explicit size since VideoLoadingSpinner uses absolute positioning
+  const loaderSpinnerContainerStyles = css({
+    position: 'absolute',
+    bottom: '25%', // Position in lower portion of screen, below logo
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '40px',
+    height: '40px',
   })
 
   const containerStyles = css({
@@ -320,14 +325,16 @@
     position: 'relative',
   })
 
-  // Logo - starts hidden, fades in once layout stable
+  // Logo - VISIBLE IMMEDIATELY during loading for branded loader experience
+  // Shows through the loader overlay (z-index 200 > loader z-index 150)
   const logoStyles = css({
     width: '100%',
     maxWidth: '100%',
     height: 'auto',
     margin: '0',
-    opacity: '0', // Prevent flash before GSAP takes over
-    visibility: 'hidden',
+    // Logo visible by default - shows branded loading screen
+    opacity: '1',
+    visibility: 'visible',
   })
 
   // Supporting text container - starts hidden via CSS, GSAP controls entrance
@@ -414,7 +421,12 @@
     style:opacity={isLoading ? 1 : 0}
     aria-hidden={!isLoading}
     data-loader
-  ></div>
+  >
+    <!-- Loading spinner below logo - egg roll style matching brand -->
+    <div class={loaderSpinnerContainerStyles}>
+      <VideoLoadingSpinner visible={isLoading} showBackdrop={false} size={40} />
+    </div>
+  </div>
 
   <!-- Video Background (filter animates based on scroll) -->
   <!-- Poster provides seamless initial display while video preloads -->

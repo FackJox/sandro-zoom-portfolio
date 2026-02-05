@@ -80,6 +80,9 @@
       font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
   </style>
+  <!-- Preload critical assets for instant loader display -->
+  <link rel="preload" href="/sandro-logo.png" as="image" type="image/png" />
+  <link rel="preload" href="/videos/showreel-poster.webp" as="image" type="image/webp" />
   <!-- Load IBM Plex fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">

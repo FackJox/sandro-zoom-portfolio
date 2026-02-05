@@ -28,6 +28,7 @@
   import StepIndicator from '../components/ui/StepIndicator.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
   import VideoThumbnail from '../components/ui/VideoThumbnail.svelte'
+  import VideoPlayer from '../components/ui/VideoPlayer.svelte'
 
   // Get portal context for scene durations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -145,6 +146,7 @@
   let filmScrollTrigger: ScrollTrigger | null = null
 
   // Playback mode state - tracks which films are showing full video vs preview
+  // 'preview' = showing preview clip, 'full' = showing full video player
   let filmPlaybackMode = $state<('preview' | 'full')[]>(films.map(() => 'preview'))
 
   // YouTube embed visibility state - tracks which films with youtubeEmbed are showing the embed
@@ -155,9 +157,19 @@
     filmPlaybackMode[index] = 'full'
   }
 
+  // Handler for closing video player (return to preview)
+  function handleCloseVideoPlayer(index: number) {
+    filmPlaybackMode[index] = 'preview'
+  }
+
   // Handler for YouTube embed play requests
   function handleShowYoutubeEmbed(index: number) {
     youtubeEmbedVisible[index] = true
+  }
+
+  // Handler for external link navigation (Redbull)
+  function handleExternalLink(url: string) {
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   // Reset to preview mode when returning to overview state
@@ -341,7 +353,7 @@
       CONTENT_EXIT: 0.622,     // 5.6s/9s - Content starts leaving
       CROSSFADE_OUT: 0.640,    // 5.8s/9s - Crossfade video player → thumbnail
       LAYOUT_RESET: 0.667,     // 6.0s/9s - Return to overview
-      OTHERS_RETURN: 0.722,    // 6.5s/9s - Others fade back in
+      OTHERS_RETURN: 0.700,    // 6.3s/9s - Others fade back in
       LABEL_RESET: 0.778,      // 7.0s/9s - Label back to "FILM"
       ACCENT_SHIFT: 0.800,     // 7.2s/9s - Prepare for next film
     }
@@ -754,8 +766,15 @@
     height: '100%',
   })
 
-  // Egg roll play button styles - used in focus mode for Netflix/Redbull
-  const focusPlayButtonStyles = css({
+  // Preview with play button container - for layering thumbnail and button
+  const previewWithPlayStyles = css({
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  })
+
+  // Egg roll play button styles - always visible variant for focus mode
+  const focusPlayButtonVisibleStyles = css({
     position: 'absolute',
     inset: '0',
     display: 'flex',
@@ -764,12 +783,16 @@
     backgroundColor: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    opacity: '0',
-    transition: 'opacity 175ms, background-color 175ms',
+    opacity: '1',
+    transition: 'background-color 175ms ease-out',
     zIndex: '20',
     '&:hover': {
-      opacity: '1',
       backgroundColor: 'rgba(15, 23, 26, 0.4)',
+    },
+    '&:focus-visible': {
+      outline: '1.5px solid',
+      outlineColor: 'brand.accent',
+      outlineOffset: '-1.5px',
     },
   })
 
@@ -781,13 +804,17 @@
     alignItems: 'center',
     justifyContent: 'center',
     filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
+    transition: 'transform 175ms ease-out',
+    'button:hover &': {
+      transform: 'scale(1.08)',
+    },
   })
 
   const eggRollTriangleStyles = css({
     width: '24px',
     height: '24px',
     marginLeft: '3px',
-    color: 'brand.accent',
+    fill: 'brand.accent',
   })
 
   const overlayStyles = css({
@@ -924,18 +951,14 @@
                 alt={film.title}
               />
             {:else if film.media.type === 'video'}
-              <!-- Local video: Use VideoThumbnail with poster → preview → full -->
+              <!-- Local video: Use VideoThumbnail with poster → preview -->
               <VideoThumbnail
                 poster={film.media.poster}
                 previewSrc={film.media.previewSrc}
                 previewSrcWebm={film.media.previewSrcWebm}
                 previewSrcHevc={film.media.previewSrcHevc}
-                fullSrc={film.media.src}
-                fullSrcWebm={film.media.srcWebm}
-                fullSrcHevc={film.media.srcHevc}
                 alt={film.title}
-                mode={filmPlaybackMode[i]}
-                onRequestFullVideo={() => handleRequestFullVideo(i)}
+                mode="preview"
               />
             {:else if film.media.type === 'image'}
               <!-- Image with optional external link -->
@@ -986,7 +1009,7 @@
         {:else if currentFilm.media.type === 'video'}
           <!-- Video type with special handling for YouTube embed or external link -->
           {#if currentFilm.media.youtubeEmbed}
-            <!-- YouTube embed in focus mode (Netflix) - poster first, then embed -->
+            <!-- YouTube embed in focus mode (Netflix) - preview first, then embed -->
             {#if youtubeEmbedVisible[activeIndex]}
               <iframe
                 src={currentFilm.media.youtubeEmbed + '?autoplay=1'}
@@ -996,6 +1019,33 @@
                 allowfullscreen
               ></iframe>
             {:else}
+              <!-- Preview with always-visible play button -->
+              <div class={previewWithPlayStyles}>
+                <VideoThumbnail
+                  poster={currentFilm.media.poster}
+                  previewSrc={currentFilm.media.previewSrc}
+                  previewSrcWebm={currentFilm.media.previewSrcWebm}
+                  previewSrcHevc={currentFilm.media.previewSrcHevc}
+                  alt={currentFilm.title}
+                  mode="preview"
+                />
+                <button
+                  class={focusPlayButtonVisibleStyles}
+                  onclick={() => handleShowYoutubeEmbed(activeIndex)}
+                  aria-label="Play video on YouTube"
+                  type="button"
+                >
+                  <div class={eggRollContainerStyles}>
+                    <svg class={eggRollTriangleStyles} viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </button>
+              </div>
+            {/if}
+          {:else if currentFilm.media.externalLink}
+            <!-- External link in focus mode (Redbull) - preview with play button that navigates -->
+            <div class={previewWithPlayStyles}>
               <VideoThumbnail
                 poster={currentFilm.media.poster}
                 previewSrc={currentFilm.media.previewSrc}
@@ -1005,59 +1055,46 @@
                 mode="preview"
               />
               <button
-                class={focusPlayButtonStyles}
-                onclick={() => handleShowYoutubeEmbed(activeIndex)}
-                aria-label="Play video"
+                class={focusPlayButtonVisibleStyles}
+                onclick={() => handleExternalLink(currentFilm.media.externalLink!)}
+                aria-label="Watch on RedBull TV"
                 type="button"
               >
                 <div class={eggRollContainerStyles}>
-                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
-                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
-                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
-                  </svg>
-                  <svg class={eggRollTriangleStyles} viewBox="0 0 24 24" fill="currentColor">
+                  <svg class={eggRollTriangleStyles} viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
                 </div>
               </button>
-            {/if}
-          {:else if currentFilm.media.externalLink}
-            <!-- External link wrapper in focus mode (Redbull) -->
-            <a href={currentFilm.media.externalLink} target="_blank" rel="noopener noreferrer" class={externalLinkStyles}>
+            </div>
+          {:else}
+            <!-- Standard video (Afghanistan, Grace) with full VideoPlayer -->
+            {#if filmPlaybackMode[activeIndex] === 'full'}
+              <!-- Full video player with controls -->
+              <VideoPlayer
+                poster={currentFilm.media.poster}
+                src={currentFilm.media.src}
+                srcWebm={currentFilm.media.srcWebm}
+                srcHevc={currentFilm.media.srcHevc}
+                alt={currentFilm.title}
+                onClose={() => handleCloseVideoPlayer(activeIndex)}
+              />
+            {:else}
+              <!-- Preview with prominent play button -->
               <VideoThumbnail
                 poster={currentFilm.media.poster}
                 previewSrc={currentFilm.media.previewSrc}
                 previewSrcWebm={currentFilm.media.previewSrcWebm}
                 previewSrcHevc={currentFilm.media.previewSrcHevc}
+                fullSrc={currentFilm.media.src}
+                fullSrcWebm={currentFilm.media.srcWebm}
+                fullSrcHevc={currentFilm.media.srcHevc}
                 alt={currentFilm.title}
                 mode="preview"
+                showPlayButton={true}
+                onRequestFullVideo={() => handleRequestFullVideo(activeIndex)}
               />
-              <div class={focusPlayButtonStyles} style="pointer-events: none;">
-                <div class={eggRollContainerStyles}>
-                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
-                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
-                    <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
-                  </svg>
-                  <svg class={eggRollTriangleStyles} viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-            </a>
-          {:else}
-            <!-- Standard video with play button for full video -->
-            <VideoThumbnail
-              poster={currentFilm.media.poster}
-              previewSrc={currentFilm.media.previewSrc}
-              previewSrcWebm={currentFilm.media.previewSrcWebm}
-              previewSrcHevc={currentFilm.media.previewSrcHevc}
-              fullSrc={currentFilm.media.src}
-              fullSrcWebm={currentFilm.media.srcWebm}
-              fullSrcHevc={currentFilm.media.srcHevc}
-              alt={currentFilm.title}
-              mode={filmPlaybackMode[activeIndex]}
-              onRequestFullVideo={() => handleRequestFullVideo(activeIndex)}
-            />
+            {/if}
           {/if}
         {:else if currentFilm.media.type === 'image'}
           {#if currentFilm.media.externalLink}

@@ -33,6 +33,8 @@
     mode?: 'preview' | 'full'
     /** Callback when full video is requested */
     onRequestFullVideo?: () => void
+    /** Always show play button (not just on hover) */
+    showPlayButton?: boolean
   }
 
   let {
@@ -45,7 +47,8 @@
     fullSrcHevc,
     alt = '',
     mode = 'preview',
-    onRequestFullVideo
+    onRequestFullVideo,
+    showPlayButton = false
   }: Props = $props()
 
   // State
@@ -151,7 +154,7 @@
     transition: 'opacity 315ms cubic-bezier(0.19, 1.0, 0.22, 1.0)',
   })
 
-  // Play button overlay (appears on hover when full video available)
+  // Play button overlay (appears on hover when full video available, or always when showPlayButton=true)
   const playButtonStyles = css({
     position: 'absolute',
     inset: '0',
@@ -161,18 +164,31 @@
     backgroundColor: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    opacity: '0',
     transition: 'opacity 175ms, background-color 175ms',
     zIndex: '20',
     '&:hover': {
-      opacity: '1',
       backgroundColor: 'rgba(15, 23, 26, 0.4)',
     },
     '&:focus-visible': {
-      opacity: '1',
       backgroundColor: 'rgba(15, 23, 26, 0.4)',
       outline: 'none',
     },
+  })
+
+  // For hover-only mode
+  const playButtonHoverOnlyStyles = css({
+    opacity: '0',
+    '&:hover': {
+      opacity: '1',
+    },
+    '&:focus-visible': {
+      opacity: '1',
+    },
+  })
+
+  // For always-visible mode
+  const playButtonAlwaysVisibleStyles = css({
+    opacity: '1',
   })
 
   // Egg roll play button container
@@ -186,12 +202,12 @@
     filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
   })
 
-  // Play triangle inside egg roll
+  // Play triangle inside egg roll - use fill for SVG
   const playIconStyles = css({
     width: '24px',
     height: '24px',
     marginLeft: '3px',
-    color: 'brand.accent',
+    fill: 'brand.accent',
   })
 </script>
 
@@ -267,19 +283,15 @@
   <VideoLoadingSpinner visible={showSpinner} />
 
   <!-- Play button overlay for requesting full video - egg roll style -->
-  {#if mode === 'preview' && hasFullVideo}
+  {#if mode === 'preview' && hasFullVideo && !showSpinner}
     <button
-      class={playButtonStyles}
+      class="{playButtonStyles} {showPlayButton ? playButtonAlwaysVisibleStyles : playButtonHoverOnlyStyles}"
       onclick={requestFullVideo}
       aria-label="Play full video"
       type="button"
     >
       <div class={eggRollContainerStyles}>
-        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="position: absolute; inset: 0;">
-          <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" opacity="0.3" />
-          <circle cx="32" cy="32" r="30" stroke="#f6c605" stroke-width="1.5" stroke-dasharray="141 47" />
-        </svg>
-        <svg class={playIconStyles} viewBox="0 0 24 24" fill="currentColor">
+        <svg class={playIconStyles} viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z"/>
         </svg>
       </div>
