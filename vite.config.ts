@@ -7,5 +7,9 @@ export default defineConfig({
 		fs: {
 			allow: ['styled-system']
 		}
+	},
+	ssr: {
+		// GSAP is CommonJS - bundle it during SSR build to avoid ESM import issues
+		noExternal: ['gsap']
 	}
 });
