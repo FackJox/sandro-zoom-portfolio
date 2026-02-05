@@ -27,6 +27,10 @@
     padding: '12px',
     margin: '-12px',
 
+    // Vertical alignment: shift up so the center of the two lines
+    // aligns with the center of the section label text
+    marginTop: '-16px',
+
     // Layout
     display: 'flex',
     flexDirection: 'column',

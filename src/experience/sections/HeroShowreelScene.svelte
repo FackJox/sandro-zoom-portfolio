@@ -89,33 +89,37 @@
   // Showreel label opacity (fade in during transition)
   const showreelLabelOpacity = $derived(transitionProgress)
 
-  // Video load detection
+  // Video load detection - optimized for fast loader transition
+  // Uses 'canplay' instead of 'canplaythrough' since poster provides visual fallback
+  // With progressive mounting, showreel now has 100% bandwidth priority
   $effect(() => {
     if (!videoEl) return
 
-    const handleCanPlayThrough = () => {
+    const handleCanPlay = () => {
       videoReady = true
       onVideoReady?.()
     }
 
     // Check if already ready (cached video)
-    if (videoEl.readyState >= 4) {
-      handleCanPlayThrough()
+    // readyState 3 = HAVE_FUTURE_DATA (enough to start playing)
+    if (videoEl.readyState >= 3) {
+      handleCanPlay()
       return
     }
 
-    videoEl.addEventListener('canplaythrough', handleCanPlayThrough)
+    videoEl.addEventListener('canplay', handleCanPlay)
 
-    // Timeout fallback (5 seconds)
+    // Shorter timeout fallback (2.5 seconds) - poster provides seamless visual
+    // Prioritize fast loader transition over waiting for full buffer
     const timeout = setTimeout(() => {
       if (!videoReady) {
         videoReady = true
         onVideoReady?.()
       }
-    }, 5000)
+    }, 2500)
 
     return () => {
-      videoEl?.removeEventListener('canplaythrough', handleCanPlayThrough)
+      videoEl?.removeEventListener('canplay', handleCanPlay)
       clearTimeout(timeout)
     }
   })
@@ -268,13 +272,15 @@
     pointerEvents: 'none',
   })
 
-  // Spinner container - positioned in content flow below logo
-  // Needs explicit size since VideoLoadingSpinner uses absolute positioning
+  // Spinner container - always in DOM to prevent layout shift
+  // Visibility controlled via opacity/visibility, not conditional rendering
   const loaderSpinnerContainerStyles = css({
     position: 'relative',
     width: '40px',
     height: '40px',
     marginTop: '2rem',
+    // Fade out transition matching loader overlay
+    transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0), visibility 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
   })
 
   const containerStyles = css({
@@ -418,6 +424,7 @@
 
   <!-- Video Background (filter animates based on scroll) -->
   <!-- Poster provides seamless initial display while video preloads -->
+  <!-- fetchpriority="high" signals browser to prioritize this over other resources -->
   <video
     bind:this={videoEl}
     class={videoStyles}
@@ -430,6 +437,7 @@
     playsinline
     disablepictureinpicture
     preload="auto"
+    fetchpriority="high"
   ></video>
 
   <!-- Hero Overlay (fades out during transition) -->
@@ -447,12 +455,14 @@
     <!-- Logo - fades in once layout stable, shows through loader overlay -->
     <img bind:this={logoEl} src="/sandro-logo.png" alt="Sandro" class={logoStyles} />
 
-    <!-- Loading spinner - shown during loading, positioned just below logo -->
-    {#if isLoading}
-      <div class={loaderSpinnerContainerStyles}>
-        <VideoLoadingSpinner visible={true} showBackdrop={false} size={40} />
-      </div>
-    {/if}
+    <!-- Loading spinner - always in DOM to prevent layout shift, visibility controlled via styles -->
+    <div
+      class={loaderSpinnerContainerStyles}
+      style:opacity={isLoading ? 1 : 0}
+      style:visibility={isLoading ? 'visible' : 'hidden'}
+    >
+      <VideoLoadingSpinner visible={isLoading} showBackdrop={false} size={40} />
+    </div>
 
     <!-- Supporting text - GSAP controls entrance and scroll fade-out -->
     <div

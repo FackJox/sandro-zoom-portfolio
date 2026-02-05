@@ -32,6 +32,10 @@
   let entranceReady = $state(false)
   const loadStartTime = Date.now()
 
+  // Progressive section mounting - sections mount after hero is ready
+  // This ensures showreel has 100% bandwidth priority during initial load
+  let sectionsReady = $state(false)
+
   function handleVideoReady() {
     // Ensure minimum 300ms loader display to prevent jarring instant load on cached video
     const elapsed = Date.now() - loadStartTime
@@ -45,6 +49,18 @@
       entranceReady = true
     }, delay)
   }
+
+  // Mount other sections after hero entrance animation starts
+  // Small delay ensures hero transition is smooth before other sections load their assets
+  $effect(() => {
+    if (entranceReady && !sectionsReady) {
+      // Wait for hero entrance to begin, then mount other sections
+      const timer = setTimeout(() => {
+        sectionsReady = true
+      }, 200)
+      return () => clearTimeout(timer)
+    }
+  })
 
   // About section beat data
   const aboutBeats = [
@@ -102,28 +118,33 @@
   {/snippet}
 
   <!-- Scene 1: Hero + Showreel (combined with internal fade transition) -->
+  <!-- Always mounted - has loading priority -->
   <HeroShowreelScene onVideoReady={handleVideoReady} {entranceReady} {isLoading} />
 
-  <!-- Scene 2: Film Overview -->
-  <FilmOverviewSection />
+  <!-- Remaining sections: Progressive mounting after hero is ready -->
+  <!-- This ensures showreel video has 100% bandwidth during initial load -->
+  {#if sectionsReady}
+    <!-- Scene 2: Film Overview -->
+    <FilmOverviewSection />
 
-  <!-- Scenes 3-5: About (3 full-screen beats) -->
-  {#each aboutBeats as beat, i}
-    <AboutScene
-      id={beat.id}
-      beatIndex={i}
-      totalBeats={aboutBeats.length}
-      subtitle={beat.subtitle}
-      text={beat.text}
-      imageSrc={beat.imageSrc}
-    />
-  {/each}
+    <!-- Scenes 3-5: About (3 full-screen beats) -->
+    {#each aboutBeats as beat, i}
+      <AboutScene
+        id={beat.id}
+        beatIndex={i}
+        totalBeats={aboutBeats.length}
+        subtitle={beat.subtitle}
+        text={beat.text}
+        imageSrc={beat.imageSrc}
+      />
+    {/each}
 
-  <!-- Scene 6: Services -->
-  <ServicesSection />
+    <!-- Scene 6: Services -->
+    <ServicesSection />
 
-  <!-- Scene 7: Contact -->
-  <ContactSection />
+    <!-- Scene 7: Contact -->
+    <ContactSection />
+  {/if}
 </PortalContainer>
 
 <style>
