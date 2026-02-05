@@ -20,9 +20,14 @@
 
   interface Props {
     backgroundSrc?: string
+    /** Defer asset loading until hero is ready (prioritizes showreel bandwidth) */
+    deferAssets?: boolean
   }
 
-  let { backgroundSrc = '/pictures/EVEREST CLEAN (1 of 2).jpg' }: Props = $props()
+  let {
+    backgroundSrc = '/pictures/EVEREST CLEAN (1 of 2).jpg',
+    deferAssets = false
+  }: Props = $props()
 
   // Portal context for timing calculations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)
@@ -211,12 +216,13 @@
 
 <div bind:this={containerEl} class={containerStyles} data-scene="contact">
   <!-- Background Image with Ken Burns effect -->
+  <!-- src only set when deferAssets is false, ensuring showreel has bandwidth priority -->
   <img
     bind:this={bgImageEl}
     class={bgImageStyles}
-    src={backgroundSrc}
+    src={deferAssets ? undefined : backgroundSrc}
     alt=""
-    loading="eager"
+    loading="lazy"
   />
 
   <!-- Dark Overlay -->

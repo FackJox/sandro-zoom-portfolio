@@ -14,6 +14,7 @@
 -->
 <script lang="ts">
   import { css } from '$styled/css'
+  import { VIDEOS } from '$lib/config/cdn'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
   import UIChrome from '../components/ui/UIChrome.svelte'
@@ -23,7 +24,7 @@
   }
 
   let {
-    videoSrc = '/videos/showreel.mp4'
+    videoSrc = VIDEOS.showreel.mp4
   }: Props = $props()
 
   const containerStyles = css({

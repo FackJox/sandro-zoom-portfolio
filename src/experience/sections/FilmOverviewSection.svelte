@@ -22,6 +22,7 @@
   import { gsap, ScrollTrigger, Flip, ScrollToPlugin } from '$lib/core/gsap'
   import { DURATION } from '$lib/animation/easing'
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
+  import { VIDEOS } from '$lib/config/cdn'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import BorderedViewport from '../components/ui/BorderedViewport.svelte'
   import ContentSlab from '../components/ui/ContentSlab.svelte'
@@ -69,10 +70,10 @@
       media: {
         type: 'video',
         src: '', // No full video - YouTube embed shown in focus mode
-        poster: '/videos/netflix-poster.webp',
-        previewSrc: '/videos/netflix-preview.mp4',
-        previewSrcWebm: '/videos/netflix-preview.av1.webm',
-        previewSrcHevc: '/videos/netflix-preview.hevc.mp4',
+        poster: VIDEOS.netflix.poster,
+        previewSrc: VIDEOS.netflix.preview.mp4,
+        previewSrcWebm: VIDEOS.netflix.preview.webm,
+        previewSrcHevc: VIDEOS.netflix.preview.hevc,
         youtubeEmbed: 'https://www.youtube.com/embed/8QH5hBOoz08'
       }
     },
@@ -85,10 +86,10 @@
       media: {
         type: 'video',
         src: '', // No full video - external link shown in focus mode
-        poster: '/videos/redbull-poster.webp',
-        previewSrc: '/videos/redbull-preview.mp4',
-        previewSrcWebm: '/videos/redbull-preview.av1.webm',
-        previewSrcHevc: '/videos/redbull-preview.hevc.mp4',
+        poster: VIDEOS.redbull.poster,
+        previewSrc: VIDEOS.redbull.preview.mp4,
+        previewSrcWebm: VIDEOS.redbull.preview.webm,
+        previewSrcHevc: VIDEOS.redbull.preview.hevc,
         externalLink: 'https://www.redbull.com/us-en/episodes/no-days-off-s1-e1'
       }
     },
@@ -101,15 +102,15 @@
       media: {
         type: 'video',
         // Full videos (streamed on demand)
-        src: '/videos/grace.mp4',
-        srcWebm: '/videos/grace.av1.webm',
-        srcHevc: '/videos/grace.hevc.mp4',
+        src: VIDEOS.grace.mp4,
+        srcWebm: VIDEOS.grace.webm,
+        srcHevc: VIDEOS.grace.hevc,
         // Preview clips (auto-preloaded)
-        previewSrc: '/videos/grace-preview.mp4',
-        previewSrcWebm: '/videos/grace-preview.av1.webm',
-        previewSrcHevc: '/videos/grace-preview.hevc.mp4',
+        previewSrc: VIDEOS.grace.preview.mp4,
+        previewSrcWebm: VIDEOS.grace.preview.webm,
+        previewSrcHevc: VIDEOS.grace.preview.hevc,
         // Poster (immediate)
-        poster: '/videos/grace-poster.webp'
+        poster: VIDEOS.grace.poster
       }
     },
     {
@@ -121,15 +122,15 @@
       media: {
         type: 'video',
         // Full videos (streamed on demand)
-        src: '/videos/shwab.mp4',
-        srcWebm: '/videos/shwab.av1.webm',
-        srcHevc: '/videos/shwab.hevc.mp4',
+        src: VIDEOS.shwab.mp4,
+        srcWebm: VIDEOS.shwab.webm,
+        srcHevc: VIDEOS.shwab.hevc,
         // Preview clips (auto-preloaded)
-        previewSrc: '/videos/shwab-preview.mp4',
-        previewSrcWebm: '/videos/shwab-preview.av1.webm',
-        previewSrcHevc: '/videos/shwab-preview.hevc.mp4',
+        previewSrc: VIDEOS.shwab.preview.mp4,
+        previewSrcWebm: VIDEOS.shwab.preview.webm,
+        previewSrcHevc: VIDEOS.shwab.preview.hevc,
         // Poster (immediate)
-        poster: '/videos/shwab-poster.webp'
+        poster: VIDEOS.shwab.poster
       }
     },
   ]

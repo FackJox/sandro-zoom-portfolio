@@ -33,6 +33,8 @@
     imageSrc: string
     /** Image alt text */
     imageAlt?: string
+    /** Defer asset loading until hero is ready (prioritizes showreel bandwidth) */
+    deferAssets?: boolean
   }
 
   let {
@@ -42,7 +44,8 @@
     subtitle,
     text,
     imageSrc,
-    imageAlt = subtitle
+    imageAlt = subtitle,
+    deferAssets = false
   }: Props = $props()
 
   // Portal context for timing calculations
@@ -294,11 +297,13 @@
 
 <div bind:this={containerEl} class={containerStyles} data-scene="about-{id}">
   <!-- Full-bleed background image with Ken Burns effect -->
+  <!-- src only set when deferAssets is false, ensuring showreel has bandwidth priority -->
   <img
     bind:this={bgImageEl}
-    src={imageSrc}
+    src={deferAssets ? undefined : imageSrc}
     alt={imageAlt}
     class={imageStyles}
+    loading="lazy"
   />
 
   <!-- ContentSlab - slides in after portal zoom -->

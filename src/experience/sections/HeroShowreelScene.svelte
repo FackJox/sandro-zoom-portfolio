@@ -19,6 +19,7 @@
   import { gsap, ScrollTrigger } from '$lib/core/gsap'
   import { DURATION } from '$lib/animation/easing'
   import { PORTAL_CONTEXT_KEY, type PortalSceneConfig } from '$lib/components/PortalContainer.svelte'
+  import { VIDEOS } from '$lib/config/cdn'
   import LogoStrip from '../components/ui/LogoStrip.svelte'
   import SectionLabel from '../components/ui/SectionLabel.svelte'
   import ScrollHint from '../components/ui/ScrollHint.svelte'
@@ -36,7 +37,7 @@
   }
 
   let {
-    videoSrc = '/videos/showreel.mp4',
+    videoSrc = VIDEOS.showreel.mp4,
     onVideoReady,
     entranceReady = false,
     isLoading = true
@@ -272,13 +273,24 @@
     pointerEvents: 'none',
   })
 
-  // Spinner container - always in DOM to prevent layout shift
-  // Visibility controlled via opacity/visibility, not conditional rendering
-  const loaderSpinnerContainerStyles = css({
+  // Logo wrapper - provides positioning context for spinner
+  const logoWrapperStyles = css({
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  })
+
+  // Spinner container - absolutely positioned below logo
+  // Doesn't affect flex layout or logo position
+  const loaderSpinnerContainerStyles = css({
+    position: 'absolute',
+    top: '100%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    marginTop: '2rem',
     width: '40px',
     height: '40px',
-    marginTop: '2rem',
     // Fade out transition matching loader overlay
     transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0), visibility 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
   })
@@ -430,7 +442,7 @@
     class={videoStyles}
     style:filter={videoFilter}
     src={videoSrc}
-    poster="/videos/showreel-poster.webp"
+    poster={VIDEOS.showreel.poster}
     autoplay
     loop
     muted
@@ -452,16 +464,19 @@
     style:opacity={contentOpacity}
     style:transform={contentTransform}
   >
-    <!-- Logo - fades in once layout stable, shows through loader overlay -->
-    <img bind:this={logoEl} src="/sandro-logo.png" alt="Sandro" class={logoStyles} />
+    <!-- Logo wrapper - provides positioning context for spinner -->
+    <div class={logoWrapperStyles}>
+      <!-- Logo - visible immediately, shows through loader overlay -->
+      <img bind:this={logoEl} src="/sandro-logo.png" alt="Sandro" class={logoStyles} />
 
-    <!-- Loading spinner - always in DOM to prevent layout shift, visibility controlled via styles -->
-    <div
-      class={loaderSpinnerContainerStyles}
-      style:opacity={isLoading ? 1 : 0}
-      style:visibility={isLoading ? 'visible' : 'hidden'}
-    >
-      <VideoLoadingSpinner visible={isLoading} showBackdrop={false} size={40} />
+      <!-- Loading spinner - absolutely positioned below logo, doesn't affect layout -->
+      <div
+        class={loaderSpinnerContainerStyles}
+        style:opacity={isLoading ? 1 : 0}
+        style:visibility={isLoading ? 'visible' : 'hidden'}
+      >
+        <VideoLoadingSpinner visible={isLoading} showBackdrop={false} size={40} />
+      </div>
     </div>
 
     <!-- Supporting text - GSAP controls entrance and scroll fade-out -->
