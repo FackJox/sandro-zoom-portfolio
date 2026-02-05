@@ -266,22 +266,15 @@
     zIndex: '150',
     transition: 'opacity 550ms cubic-bezier(0.25, 0.0, 0.35, 1.0)',
     pointerEvents: 'none',
-    // Flex layout to position spinner below logo area
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
   })
 
-  // Spinner container - positioned below the logo
+  // Spinner container - positioned in content flow below logo
   // Needs explicit size since VideoLoadingSpinner uses absolute positioning
   const loaderSpinnerContainerStyles = css({
-    position: 'absolute',
-    bottom: '25%', // Position in lower portion of screen, below logo
-    left: '50%',
-    transform: 'translateX(-50%)',
+    position: 'relative',
     width: '40px',
     height: '40px',
+    marginTop: '2rem',
   })
 
   const containerStyles = css({
@@ -421,12 +414,7 @@
     style:opacity={isLoading ? 1 : 0}
     aria-hidden={!isLoading}
     data-loader
-  >
-    <!-- Loading spinner below logo - egg roll style matching brand -->
-    <div class={loaderSpinnerContainerStyles}>
-      <VideoLoadingSpinner visible={isLoading} showBackdrop={false} size={40} />
-    </div>
-  </div>
+  ></div>
 
   <!-- Video Background (filter animates based on scroll) -->
   <!-- Poster provides seamless initial display while video preloads -->
@@ -458,6 +446,13 @@
   >
     <!-- Logo - fades in once layout stable, shows through loader overlay -->
     <img bind:this={logoEl} src="/sandro-logo.png" alt="Sandro" class={logoStyles} />
+
+    <!-- Loading spinner - shown during loading, positioned just below logo -->
+    {#if isLoading}
+      <div class={loaderSpinnerContainerStyles}>
+        <VideoLoadingSpinner visible={true} showBackdrop={false} size={40} />
+      </div>
+    {/if}
 
     <!-- Supporting text - GSAP controls entrance and scroll fade-out -->
     <div

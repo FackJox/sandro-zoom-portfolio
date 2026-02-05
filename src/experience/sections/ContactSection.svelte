@@ -22,7 +22,7 @@
     backgroundSrc?: string
   }
 
-  let { backgroundSrc = '/pictures/Film Himal Sicker 01.jpg' }: Props = $props()
+  let { backgroundSrc = '/pictures/EVEREST CLEAN (1 of 2).jpg' }: Props = $props()
 
   // Portal context for timing calculations
   const portalConfig = getContext<PortalSceneConfig>(PORTAL_CONTEXT_KEY)

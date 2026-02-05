@@ -6,11 +6,11 @@
 
   Design: Alpine Noir - machine precision, camera-like
   From: docs/Brand Design System.md
+
+  Uses CSS animation for reliable spinning from first render (no GSAP timing issues).
 -->
 <script lang="ts">
   import { css } from '$styled/css'
-  import { onMount, onDestroy } from 'svelte'
-  import { gsap } from '$lib/core/gsap'
 
   interface Props {
     /** Spinner size in pixels */
@@ -22,28 +22,6 @@
   }
 
   let { size = 48, visible = true, showBackdrop = true }: Props = $props()
-
-  let spinnerEl: SVGSVGElement | null = $state(null)
-  let ctx: gsap.Context | null = $state(null)
-
-  onMount(() => {
-    if (!spinnerEl) return
-
-    ctx = gsap.context(() => {
-      // Continuous rotation - machine precision
-      gsap.to(spinnerEl, {
-        rotation: 360,
-        duration: 1.2,
-        ease: 'none',
-        repeat: -1,
-        transformOrigin: 'center center'
-      })
-    }, spinnerEl)
-  })
-
-  onDestroy(() => {
-    ctx?.revert()
-  })
 
   // Container with optional backdrop
   const containerStyles = css({
@@ -66,7 +44,7 @@
     backdropFilter: 'blur(2px)',
   })
 
-  // Spinner uses brand.accent (#f6c605 - Egg Toast yellow)
+  // Spinner base styles - color only, animation in CSS
   const spinnerStyles = css({
     position: 'relative',
     zIndex: '1',
@@ -86,7 +64,6 @@
   {/if}
 
   <svg
-    bind:this={spinnerEl}
     class={spinnerStyles}
     width={size}
     height={size}
@@ -116,3 +93,15 @@
     />
   </svg>
 </div>
+
+<style>
+  /* CSS animation for spinner - runs immediately without JS */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  svg {
+    animation: spin 1.2s linear infinite;
+  }
+</style>
