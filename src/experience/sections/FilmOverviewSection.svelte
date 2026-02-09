@@ -194,7 +194,7 @@
   const FILM_RANGE = ACTIVE_RANGE / films.length // 22.5% each
 
   // Phase thresholds within each film's cycle (relative to FILM_RANGE)
-  const PHASE_LAYOUT_SHIFT = 0.222
+  const PHASE_LAYOUT_SHIFT = 0.333
   const PHASE_LAYOUT_RESET = 0.667
 
   /**
@@ -215,9 +215,9 @@
     const filmCycleStart = ACTIVE_START + (index * FILM_RANGE)
 
     // Target the middle of "reading time" - when ContentSlab is fully visible
-    // CONTENT_ENTER = 0.289, CONTENT_EXIT = 0.622
-    // Middle = (0.289 + 0.622) / 2 = 0.4555
-    const CONTENT_ENTER = 0.289
+    // CONTENT_ENTER = 0.400, CONTENT_EXIT = 0.622
+    // Middle = (0.400 + 0.622) / 2 = 0.511
+    const CONTENT_ENTER = 0.400
     const CONTENT_EXIT = 0.622
     const readingTimeMidpoint = (CONTENT_ENTER + CONTENT_EXIT) / 2
     const targetProgress = filmCycleStart + (FILM_RANGE * readingTimeMidpoint)
@@ -345,12 +345,12 @@
     const PHASES = {
       HOLD_START: 0.03,        // Brief hold before animations start
       BORDER_FADE: 0.089,      // 0.8s/9s - Border accent change
-      OTHERS_EXIT: 0.133,      // 1.2s/9s - Others start fading
-      LABEL_SCRAMBLE: 0.200,   // 1.8s/9s - Label text scramble
-      LAYOUT_SHIFT: 0.222,     // 2.0s/9s - Layout transition begins
-      CROSSFADE_IN: 0.260,     // 2.3s/9s - Crossfade thumbnail → video player
-      CONTENT_ENTER: 0.289,    // 2.6s/9s - Content slab enters
-      // HOLD for reading: 2.6s - 5.6s = 3s reading time
+      OTHERS_EXIT: 0.200,      // 1.8s/9s - Others start shrinking (delayed to let dimming breathe)
+      LABEL_SCRAMBLE: 0.267,   // 2.4s/9s - Label text scramble
+      LAYOUT_SHIFT: 0.333,     // 3.0s/9s - Layout transition begins (pushed later for dimming visibility)
+      CROSSFADE_IN: 0.367,     // 3.3s/9s - Crossfade thumbnail → video player
+      CONTENT_ENTER: 0.400,    // 3.6s/9s - Content slab enters
+      // HOLD for reading: 3.6s - 5.6s = 2s reading time
       CONTENT_EXIT: 0.622,     // 5.6s/9s - Content starts leaving
       CROSSFADE_OUT: 0.640,    // 5.8s/9s - Crossfade video player → thumbnail
       LAYOUT_RESET: 0.667,     // 6.0s/9s - Return to overview
@@ -521,6 +521,12 @@
         })
       }
     })
+
+    // Extend timeline to exactly 1.0 so self.progress (0-1) maps 1:1 to timeline positions.
+    // Without this, the timeline ends at ~0.93, causing progress-to-position drift that
+    // grows with each film — the phase state races ahead of the GSAP animations,
+    // flipping to 'focus' before dimming/shrinking effects have played.
+    tl.add(() => {}, 1.0)
 
     // DEBUG: Log film cycle timeline positions summary
     console.log(`[FilmOverview] ═══════════════════════════════════════════════════════════════════`)
