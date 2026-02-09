@@ -1108,9 +1108,9 @@
     style:visibility={phase === 'focus' ? 'visible' : 'hidden'}
     style:pointer-events={phase === 'focus' ? 'auto' : 'none'}
   >
-    <!-- Video Container - keyed by activeIndex to force video element recreation -->
-    {#key activeIndex}
+    <!-- Video Container - stable GSAP target, {#key} inside forces content recreation -->
     <div class={focusVideoContainerStyles} data-focus-video style="opacity: var(--focus-video-opacity, 0);">
+      {#key activeIndex}
       <BorderedViewport aspectRatio="16/9">
         <!-- Render current film's video content (focus state) -->
         {#if currentFilm.media.type === 'youtube'}
@@ -1226,20 +1226,22 @@
           {/if}
         {/if}
       </BorderedViewport>
+      {/key}
     </div>
 
-    <!-- Content Slab Container -->
+    <!-- Content Slab Container - stable GSAP target, {#key} inside forces content recreation -->
     <div class={contentSlabContainerStyles} data-content-slab-container>
       <div data-content-slab>
+        {#key activeIndex}
         <ContentSlab
           eyebrow={currentFilm.client}
           title={currentFilm.title}
           description={currentFilm.description}
           year={currentFilm.year}
         />
+        {/key}
       </div>
     </div>
-    {/key}
   </div>
 
   <!-- UI Chrome - consistent positioning across all viewports -->
