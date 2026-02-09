@@ -197,6 +197,7 @@
   const PHASE_LAYOUT_SHIFT = 0.333
   const PHASE_LAYOUT_RESET = 0.667
 
+
   /**
    * Navigate to a specific film's details view by scrolling to its focus phase.
    *
@@ -302,6 +303,32 @@
       console.log(`[FilmOverview] Film data ${i}: id=${film.id} video=${film.media.src}`)
     })
 
+    // --- FLIP TRANSFORM CALCULATION ---
+    // Measure target position (focus video viewport) for the flip animation.
+    // Focus layout uses visibility:hidden (not display:none), so it's laid out and measurable.
+    const focusVideoEl = container.querySelector('[data-focus-video]') as HTMLElement
+    const targetViewport = focusVideoEl?.querySelector('[data-bordered-viewport]') as HTMLElement
+    const targetRect = targetViewport?.getBoundingClientRect()
+
+    const flipData: { x: number; y: number; scaleX: number; scaleY: number }[] = []
+    filmFrames.forEach((frame) => {
+      const srcViewport = frame.querySelector('[data-bordered-viewport]') as HTMLElement
+      if (srcViewport && targetRect) {
+        const srcRect = srcViewport.getBoundingClientRect()
+        flipData.push({
+          x: targetRect.left - srcRect.left,
+          y: targetRect.top - srcRect.top,
+          scaleX: targetRect.width / srcRect.width,
+          scaleY: targetRect.height / srcRect.height,
+        })
+      } else {
+        flipData.push({ x: 0, y: 0, scaleX: 1, scaleY: 1 })
+      }
+    })
+    console.log('[FilmOverview] FLIP_DATA:', flipData.map((d, i) =>
+      `film${i}: x=${d.x.toFixed(0)} y=${d.y.toFixed(0)} scaleX=${d.scaleX.toFixed(2)} scaleY=${d.scaleY.toFixed(2)}`
+    ).join(' | '))
+
     // Timeline proportions (0-1)
     const PORTAL_BUFFER = 0.05 // 5% at start and end for portal transitions
     const ACTIVE_START = PORTAL_BUFFER
@@ -322,8 +349,12 @@
       gsap.set(frame, { autoAlpha: 0, scale: 0.95, y: 0, x: 0 })
     })
 
-    // Focus layout visibility is now controlled by Svelte state (phase === 'focus')
-    // This avoids GSAP timeline issues with overlapping animations when jumping to positions
+    // Focus layout visibility is controlled by Svelte state (phase === 'focus')
+    // Focus VIDEO opacity is controlled by GSAP via CSS variable --focus-video-opacity
+    // This ensures perfect sync with the card crossfade in both scroll directions.
+    if (focusLayout) {
+      gsap.set(focusLayout, { '--focus-video-opacity': 0 })
+    }
 
     // Initialize content slab within focus layout (offset for enter animation)
     if (contentSlab) {
@@ -423,23 +454,55 @@
         }, pos(PHASES.OTHERS_EXIT))
       })
 
-      // PHASE 4: Layout shift - transition from overview grid to focus layout
-      // The focus layout is a separate CSS Grid with proper 60/40 split
-      // Fade out all thumbnails and fade in the focus layout
-      // NOTE: activeIndex and phase are now derived from scroll progress in onUpdate
+      // PHASE 4: FLIP — Active card transforms from grid position to focus video position
+      // Brand Physics: "Zoom is the Primary Verb" — this IS the camera push-in
+      // The overview grid gets elevated above the focus layout (z:25 > z:20) so
+      // the card visually covers the focus video area during the transform.
+      // Non-active cards are already faded out. The grid is transparent, so the
+      // content slab in the focus layout (z:20) shows through.
 
-      // Fade out all film frames (overview thumbnails)
-      filmFrames.forEach((frame, i) => {
-        tl.to(frame, {
+      // Elevate overview grid above focus layout for the flip
+      // pointer-events:none so the grid doesn't block content slab interaction
+      tl.set(overviewGrid, { zIndex: 25, pointerEvents: 'none' }, pos(PHASES.LAYOUT_SHIFT))
+
+      // Set transform origin to top-left for clean position+scale math
+      tl.set(currentFrame, { transformOrigin: 'top left' }, pos(PHASES.LAYOUT_SHIFT))
+
+      // Animate card to focus video position
+      tl.to(currentFrame, {
+        x: flipData[filmIndex].x,
+        y: flipData[filmIndex].y,
+        scaleX: flipData[filmIndex].scaleX,
+        scaleY: flipData[filmIndex].scaleY,
+        duration: CINEMATIC,
+        ease: 'ease-lock-on',
+      }, pos(PHASES.LAYOUT_SHIFT))
+
+      // Fade out overlay (title/client) — ContentSlab replaces this info
+      const currentOverlay = currentFrame.querySelector('[data-film-overlay]') as HTMLElement
+      if (currentOverlay) {
+        tl.to(currentOverlay, {
           autoAlpha: 0,
-          scale: 0.95,
-          duration: CINEMATIC,
+          duration: STANDARD,
           ease: 'ease-release',
         }, pos(PHASES.LAYOUT_SHIFT))
-      })
+      }
 
-      // Focus layout visibility is controlled by Svelte state (phase === 'focus')
-      // No GSAP animation needed - CSS transition handles the fade
+      // CROSSFADE: Card arrived → fade card out, fade focus video in.
+      // ROBUST PATTERN: Both opacities driven by the same scrubbed timeline
+      // with LINEAR easing so they always sum to 1.0 in both scroll directions.
+      // Non-linear easings cause opacity dips (both near 0) when reversed.
+      const flipEndAbs = pos(PHASES.LAYOUT_SHIFT) + CINEMATIC
+      tl.to(currentFrame, {
+        autoAlpha: 0,
+        duration: STANDARD,
+        ease: 'none',
+      }, flipEndAbs)
+      tl.to(focusLayout, {
+        '--focus-video-opacity': 1,
+        duration: STANDARD,
+        ease: 'none',
+      }, flipEndAbs)
 
       // PHASE 5: Content slab enters
       if (contentSlab) {
@@ -463,11 +526,55 @@
         }, pos(PHASES.CONTENT_EXIT))
       }
 
-      // PHASE 7: Layout reset - transition from focus layout back to overview grid
-      // Focus layout fade-out is handled by Svelte state (phase !== 'focus')
+      // CROSSFADE BACK: Fade focus video out, fade card in before flip-back.
+      // LINEAR easing ensures opacities sum to 1.0 — no gaps or flashes
+      // when scrubbing in either direction.
+      const flipBackAbs = pos(PHASES.LAYOUT_RESET)
+      tl.to(focusLayout, {
+        '--focus-video-opacity': 0,
+        duration: STANDARD,
+        ease: 'none',
+      }, flipBackAbs - STANDARD)
+      tl.to(currentFrame, {
+        autoAlpha: 1,
+        duration: STANDARD,
+        ease: 'none',
+      }, flipBackAbs - STANDARD)
 
-      // Fade in all film frames (overview thumbnails)
-      filmFrames.forEach((frame, i) => {
+      // PHASE 7: FLIP BACK — Active card returns from focus position to grid
+      // Brand Physics: "ease-release" for departing — controlled release back to overview
+
+      // Animate card back to original grid position
+      tl.to(currentFrame, {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        duration: CINEMATIC,
+        ease: 'ease-release',
+      }, pos(PHASES.LAYOUT_RESET))
+
+      // Restore overlay (title/client)
+      if (currentOverlay) {
+        tl.to(currentOverlay, {
+          autoAlpha: 1,
+          duration: STANDARD,
+          ease: 'ease-lock-on',
+        }, pos(PHASES.LAYOUT_RESET))
+      }
+
+      // Reset transform origin, z-index AFTER flip-back completes.
+      // Must happen after pos(LAYOUT_RESET) + CINEMATIC, not mid-flip.
+      // Changing transformOrigin while scaleX/scaleY ≠ 1 causes visual jumps.
+      const flipBackEndAbs = pos(PHASES.LAYOUT_RESET) + CINEMATIC
+      tl.set(currentFrame, { transformOrigin: 'center center' }, flipBackEndAbs + 0.001)
+      tl.set(overviewGrid, { zIndex: 'auto', pointerEvents: 'auto' }, flipBackEndAbs + 0.001)
+
+      // Fade in OTHER film frames (overview thumbnails return)
+      // Current frame is excluded — its return is handled by the crossfade-back + flip-back sequence.
+      // Including it here would create overlapping tweens that record mid-flip "from" values,
+      // causing position jumps when reversed.
+      otherFrames.forEach((frame) => {
         tl.to(frame, {
           autoAlpha: 1,
           scale: 1,
@@ -887,8 +994,7 @@
     // Solid background to cover the overview grid thumbnails beneath
     backgroundColor: 'brand.bg',
     // Visibility controlled by inline style based on phase state
-    // Use CSS transition for smooth fade
-    transition: 'opacity 0.35s ease-out, visibility 0.35s ease-out',
+    // No CSS transition — syncs with scroll-driven flip animation
     zIndex: '20',
     overflow: 'visible', // Ensure content doesn't get clipped
 
@@ -998,11 +1104,13 @@
   <div
     class={focusLayoutStyles}
     data-focus-layout
-    style="opacity: {phase === 'focus' ? 1 : 0}; visibility: {phase === 'focus' ? 'visible' : 'hidden'}; pointer-events: {phase === 'focus' ? 'auto' : 'none'};"
+    style:opacity={phase === 'focus' ? 1 : 0}
+    style:visibility={phase === 'focus' ? 'visible' : 'hidden'}
+    style:pointer-events={phase === 'focus' ? 'auto' : 'none'}
   >
     <!-- Video Container - keyed by activeIndex to force video element recreation -->
     {#key activeIndex}
-    <div class={focusVideoContainerStyles} data-focus-video>
+    <div class={focusVideoContainerStyles} data-focus-video style="opacity: var(--focus-video-opacity, 0);">
       <BorderedViewport aspectRatio="16/9">
         <!-- Render current film's video content (focus state) -->
         {#if currentFilm.media.type === 'youtube'}
